@@ -1,0 +1,50 @@
+/*
+ * Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * openFuyao is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ */
+
+package constants
+
+// Constants for parameters
+const (
+	ThenParam     = "then"
+	CSRFParam     = "csrf"
+	UsernameParam = "username"
+	PasswordParam = "password"
+
+	NewPasswordParam      = "new_password"
+	OriginalPasswordParam = "original_password"
+)
+
+const (
+	FuyaoIdpProvider = "fuyaoPasswordProvider"
+)
+
+// Constants for cookie-names
+// 这里openshift加了一个expire time
+const (
+	UserName   = "user.name"
+	UserUID    = "user.uid"
+	UserGroups = "user.groups"
+	UserExtra  = "user.extra"
+)
+
+// Constants for code, access, refresh token prefixes
+const (
+	CodePrefix    = "code-"
+	AccessPrefix  = "access-"
+	RefreshPrefix = "refresh-"
+)
+
+// Constants for password complexity check
+const (
+	PasswordMinLen = 8
+	PasswordMaxLen = 32
+)

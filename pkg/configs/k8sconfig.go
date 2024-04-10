@@ -1,0 +1,114 @@
+/*
+ * Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * openFuyao is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ */
+
+package configs
+
+import (
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+	"oauth-server/pkg/zlog"
+	"os"
+	"os/user"
+	"path"
+)
+
+// KubernetesConfig specifies the configuration for k8s client
+type KubernetesConfig struct {
+	// KubeConfigFile defines the path to fetch kubeconfig
+	KubeConfigFile string `json:"kubeConfigFile" yaml:"kubeConfigFile"`
+
+	// QPS is kubernetes clientset qps
+	QPS float32 `json:"qps,omitempty" yaml:"qps,omitempty"`
+
+	// Burst is kubernetes clientset burst
+	Burst int `json:"burst,omitempty" yaml:"burst,omitempty"`
+}
+
+// NewKubernetesConfig 返回默认的 k8s 相关配置（如KubeConfig）
+func NewKubernetesConfig() (option *KubernetesConfig) {
+	return &KubernetesConfig{
+		KubeConfigFile: getDefaultKubeConfigFile(),
+		QPS:            1e6,
+		Burst:          1e6,
+	}
+}
+
+func getDefaultKubeConfigFile() string {
+	kubeConfigFile := ""
+	homePath := homedir.HomeDir()
+	if homePath == "" {
+		if u, err := user.Current(); err == nil {
+			homePath = u.HomeDir
+		}
+	}
+
+	// TODO: maybe change it to /var/run/secrets/kubernetes.io/serviceaccount
+	userHomeConfig := path.Join(homePath, ".kube/config")
+	if _, err := os.Stat(userHomeConfig); err == nil {
+		kubeConfigFile = userHomeConfig
+	}
+	return kubeConfigFile
+}
+
+// GetKubeConfigOrInClusterConfig loads in-cluster config if kubeConfigFile is empty or the file if not,
+// then applies overrides.
+func GetKubeConfigOrInClusterConfig(k8sConfig *KubernetesConfig) (clientConfig *rest.Config) {
+	var err error
+	if k8sConfig != nil && len(k8sConfig.KubeConfigFile) > 0 {
+		clientConfig, err = clientcmd.BuildConfigFromFlags("", k8sConfig.KubeConfigFile)
+		if err != nil {
+			return clientConfig
+		}
+	}
+
+	if k8sConfig == nil {
+		k8sConfig = NewKubernetesConfig()
+	}
+
+	clientConfig, err = rest.InClusterConfig()
+	if err != nil {
+		zlog.Warn("Get KubeConfig In Cluster Config error, Attempting to obtain from the default configuration file")
+		kubeConfigFile := getDefaultKubeConfigFile()
+		if kubeConfigFile == "" {
+			zlog.Fatalf("Error creating in-cluster config: %v", err)
+		}
+		if _, err = os.Stat(kubeConfigFile); err != nil {
+			zlog.Fatalf("Error creating in-filePath config: %v", err)
+		}
+		clientConfig, err = clientcmd.BuildConfigFromFlags("", kubeConfigFile)
+		if err != nil {
+			zlog.Fatalf("Error creating k8s config")
+		}
+	}
+
+	// override burst and qps
+	if k8sConfig.QPS != 0 {
+		clientConfig.QPS = k8sConfig.QPS
+	}
+	if k8sConfig.Burst != 0 {
+		clientConfig.Burst = k8sConfig.Burst
+	}
+
+	return clientConfig
+}
+
+func GetKubernetesClient(k8sConfig *KubernetesConfig) kubernetes.Interface {
+	kubeConfig := GetKubeConfigOrInClusterConfig(k8sConfig)
+	k8sClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		zlog.Fatalf("Error converting k8s config to k8sclient")
+	}
+
+	return k8sClient
+}
