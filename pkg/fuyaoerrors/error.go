@@ -34,6 +34,7 @@ const (
 	ErrStrFailToMarshalData            = "cannot unmarshal data"
 	ErrStrFailToUnmarshalData          = "cannot unmarshal data"
 	ErrStrNotFirstLogin                = "this user has already logged in before, should not change the password"
+	ErrStrLoginBlocked                 = "request is blocked due to multiple failed login attempts"
 )
 
 var (
@@ -53,6 +54,7 @@ var (
 	ErrFailToMarshalData            = errors.New(ErrStrFailToMarshalData)
 	ErrFailToUnmarshalData          = errors.New(ErrStrFailToUnmarshalData)
 	ErrNotFirstLogin                = errors.New(ErrStrNotFirstLogin)
+	ErrLoginBlocked                 = errors.New(ErrStrLoginBlocked)
 )
 
 var ErrStatusCode = map[error]int{
@@ -72,4 +74,5 @@ var ErrStatusCode = map[error]int{
 	ErrFailToMarshalData:            http.StatusInternalServerError,
 	ErrFailToUnmarshalData:          http.StatusInternalServerError,
 	ErrNotFirstLogin:                http.StatusConflict,
+	ErrLoginBlocked:                 http.StatusUnauthorized,
 }

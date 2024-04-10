@@ -16,6 +16,7 @@ package fuyaopassword
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
 	"net/http"
@@ -24,17 +25,21 @@ import (
 	"oauth-server/pkg/constants"
 	"oauth-server/pkg/fuyaoerrors"
 	"oauth-server/pkg/idp"
+	"oauth-server/pkg/protector"
 	"oauth-server/pkg/sessions"
 	"oauth-server/pkg/zlog"
+	"strings"
 	"text/template"
+	"time"
 )
 
 // Login works for fuyao login, implement the login interfaces
 type Login struct {
 	Provider string
 	// CSRF csrf.CSRF
-	Authenticator authenticators.PasswordAuthenticator
-	idpLoginStore *sessions.CookieStore
+	Authenticator    authenticators.PasswordAuthenticator
+	idpLoginStore    *sessions.CookieStore
+	loginIPProtector *protector.LoginIPProtector
 }
 
 func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) error {
@@ -54,11 +59,12 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 }
 
 // NewLogin returns the fuyao Login instance
-func NewLogin(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, ns string) *Login {
+func NewLogin(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, loginIPProtector *protector.LoginIPProtector, ns string) *Login {
 	return &Login{
-		Provider:      "fuyaoPaswordProvider",
-		Authenticator: authenticators.NewFuyaoPasswordAuthenticator(k8sClient, ns),
-		idpLoginStore: idpLoginStore,
+		Provider:         "fuyaoPaswordProvider",
+		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, ns),
+		idpLoginStore:    idpLoginStore,
+		loginIPProtector: loginIPProtector,
 	}
 }
 
@@ -169,7 +175,6 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	then := r.FormValue(constants.ThenParam)
 
 	// TODO: then 要check是否是当前访问的relative url，不是要重定向到 "/" 这里是不是一定是绝对url
-
 	// TODO: 验证 CSRF Token
 
 	// 验证用户名 密码
@@ -179,31 +184,54 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	if len(then) == 0 {
 		then = "/"
 	}
-
-	// 处理登录逻辑
 	zlog.Infof("Login request: Username: %s, Then: %s\n", username, then)
 
-	// TODO: 防爆破check，是否当前ip会被封禁
+	// 防爆破check，是否当前ip会被封禁
+	ipAddress := getIPAddress(r)
+	if l.loginIPProtector.IsLocked(ipAddress) {
+		http.Error(w, fuyaoerrors.ErrStrLoginBlocked, http.StatusUnauthorized)
+		return
+	}
 
 	// 进行登陆check
 	response, ok, err := l.Authenticator.AuthenticatePassword(context.Background(), username, password)
-	if err != nil {
+
+	// service internal error
+	if err != nil && !errors.Is(err, fuyaoerrors.ErrPasswordAuthenticationFailed) {
 		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
 		return
 	}
+
+	// password authentication error
 	if !ok {
+		// current ip failed times +1
+		l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
 		http.Error(w, fuyaoerrors.ErrStrPasswordAuthenticationFailed, http.StatusUnauthorized)
+		return
 	}
+
+	// successfully login, erase ip block flag
+	l.loginIPProtector.Unlock(ipAddress)
 
 	// TODO: 将session中写入用户信息，这里的sessionSave有bug
 	if err = l.saveLoginStateToSession(response.User, w); err != nil {
 		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
 		return
-
 	}
 
 	zlog.Infof("Successfully logging in with %s", response.User.GetName())
 
 	// 重定向回到 /oauth/authorize
 	http.Redirect(w, r, then, http.StatusFound)
+}
+
+// ---- util functions ----
+func getIPAddress(r *http.Request) string {
+	ipWithPort := r.RemoteAddr
+
+	// fetch the first part if port is contained in the ipWithPort
+	ipParts := strings.Split(ipWithPort, ":")
+	ip := ipParts[0]
+
+	return ip
 }
