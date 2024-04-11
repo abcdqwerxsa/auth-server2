@@ -103,7 +103,8 @@ func (l *Login) FuyaoPasswordConfirmHandler(w http.ResponseWriter, r *http.Reque
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
 	if !ok {
-		http.Error(w, fuyaoerrors.ErrStrNotFirstLogin, http.StatusConflict)
+		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusUnauthorized)
+		return
 	}
 
 	// read params from r.url
@@ -111,13 +112,21 @@ func (l *Login) FuyaoPasswordConfirmHandler(w http.ResponseWriter, r *http.Reque
 	then := r.FormValue(constants.ThenParam)
 	if len(newPassword) == 0 {
 		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
+		return
 	}
 	if len(then) == 0 {
 		then = "/"
 	}
 
+	// password confirmation logic
 	if err := l.Authenticator.ConfirmPassword(context.Background(), username, newPassword); err != nil {
 		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+		return
+	}
+
+	// no need to keep the info in idpLoginStore, erase them in the cookie/database
+	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+		zlog.Warnf("cannot delete the loginstore used in authorization, err: %v", err)
 	}
 	zlog.Infof("Password Confirmation succeed for user: %s", username)
 
@@ -132,10 +141,12 @@ func (l *Login) FuyaoPasswordResetHandler(w http.ResponseWriter, r *http.Request
 	newPassword := r.FormValue(constants.NewPasswordParam)
 	if len(username) == 0 || len(oldPassword) == 0 || len(newPassword) == 0 {
 		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
+		return
 	}
 
 	if err := l.Authenticator.ResetPassword(context.Background(), username, oldPassword, newPassword); err != nil {
 		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+		return
 	}
 	zlog.Infof("Password Reset succeed for user: %s", username)
 
@@ -180,6 +191,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// 验证用户名 密码
 	if len(username) == 0 || len(password) == 0 {
 		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
+		return
 	}
 	if len(then) == 0 {
 		then = "/"

@@ -23,6 +23,7 @@ const (
 	ErrStrFailToParseForm              = "cannot parse the form"
 	ErrStrLoginServiceDown             = "the login server returns error, please check logs for details"
 	ErrStrPasswordAuthenticationFailed = "incorrect username or password"
+	ErrStrPasswordSame                 = "the new password is the same as the original password"
 	ErrStrPasswordTooWeak              = "the input new password cannot pass the complexity check"
 	ErrStrIdentityProviderIncorrect    = "the input identity_provider is not valid"
 	ErrStrTokenTypeUnrecognized        = "the input token type is not valid"
@@ -33,7 +34,8 @@ const (
 	ErrStrNotImplemented               = "function is not implemented"
 	ErrStrFailToMarshalData            = "cannot unmarshal data"
 	ErrStrFailToUnmarshalData          = "cannot unmarshal data"
-	ErrStrNotFirstLogin                = "this user has already logged in before, should not change the password"
+	ErrStrNotFirstLogin                = "this user is not the first time logging in, please go to the login page"
+	ErrStrNotLogin                     = "user not logged in, unauthorized to do anything"
 	ErrStrLoginBlocked                 = "request is blocked due to multiple failed login attempts"
 )
 
@@ -43,6 +45,7 @@ var (
 	ErrFailToParseForm              = errors.New(ErrStrFailToParseForm)
 	ErrLoginServiceDown             = errors.New(ErrStrLoginServiceDown)
 	ErrPasswordAuthenticationFailed = errors.New(ErrStrPasswordAuthenticationFailed)
+	ErrPasswordSame                 = errors.New(ErrStrPasswordSame)
 	ErrPasswordTooWeak              = errors.New(ErrStrPasswordTooWeak)
 	ErrIdentityProviderIncorrect    = errors.New(ErrStrIdentityProviderIncorrect)
 	ErrTokenTypeUnrecognized        = errors.New(ErrStrTokenTypeUnrecognized)
@@ -54,6 +57,7 @@ var (
 	ErrFailToMarshalData            = errors.New(ErrStrFailToMarshalData)
 	ErrFailToUnmarshalData          = errors.New(ErrStrFailToUnmarshalData)
 	ErrNotFirstLogin                = errors.New(ErrStrNotFirstLogin)
+	ErrNotLogin                     = errors.New(ErrStrNotLogin)
 	ErrLoginBlocked                 = errors.New(ErrStrLoginBlocked)
 )
 
@@ -63,6 +67,7 @@ var ErrStatusCode = map[error]int{
 	ErrFailToParseForm:              http.StatusInternalServerError,
 	ErrLoginServiceDown:             http.StatusInternalServerError,
 	ErrPasswordAuthenticationFailed: http.StatusUnauthorized,
+	ErrPasswordSame:                 http.StatusUnauthorized,
 	ErrPasswordTooWeak:              http.StatusBadRequest,
 	ErrIdentityProviderIncorrect:    http.StatusBadRequest,
 	ErrTokenTypeUnrecognized:        http.StatusBadRequest,
@@ -74,5 +79,6 @@ var ErrStatusCode = map[error]int{
 	ErrFailToMarshalData:            http.StatusInternalServerError,
 	ErrFailToUnmarshalData:          http.StatusInternalServerError,
 	ErrNotFirstLogin:                http.StatusConflict,
+	ErrNotLogin:                     http.StatusUnauthorized,
 	ErrLoginBlocked:                 http.StatusUnauthorized,
 }

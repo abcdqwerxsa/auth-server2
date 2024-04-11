@@ -46,9 +46,8 @@ type FuyaoPasswordAuthenticator struct {
 	// session-store 实现，这个是存储用户是否已经通过账户密码登录的接口
 	k8sClient kubernetes.Interface
 	ns        string
-	// TODO: should we let users configure these two
-	saltLength int
-	encryptor  Encryptor
+	// TODO: should we let users configure the encryptor
+	encryptor Encryptor
 }
 
 func NewFuyaoPasswordAuthenticator(k8sClient kubernetes.Interface, namespace string) *FuyaoPasswordAuthenticator {
@@ -222,11 +221,13 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, password string, fir
 	}
 
 	// check whether firstLogin
-	storedFirstLogin, err := base64.StdEncoding.DecodeString(string(secret.Data["first-login"]))
-	if err != nil {
+	extra, _ := readExtraFromSecretData(secret.Data, "extra")
+	firstLoginField, ok := extra["first-login"]
+	if !ok {
 		return fuyaoerrors.ErrLoginServiceDown
 	}
-	if firstLogin && string(storedFirstLogin) == "false" {
+	storedFirstLogin := firstLoginField[0]
+	if firstLogin && storedFirstLogin == "false" {
 		zlog.Errorf("the user has already logged in and changed the password, cannot reconfirm it")
 		return fuyaoerrors.ErrNotFirstLogin
 	}
@@ -238,8 +239,21 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, password string, fir
 	}
 
 	// set new password
-	secret.Data["encrypted-password"] = []byte(base64.StdEncoding.EncodeToString([]byte(encryptedPassword)))
-	secret.Data["first-login"] = []byte(base64.StdEncoding.EncodeToString([]byte("false")))
+	secret.Data["encrypted-password"] = []byte(encryptedPassword)
+	extra["first-login"][0] = "false"
+	byteExtra, err := json.Marshal(extra)
+	if err != nil {
+		zlog.Errorf("fail to marshal extra bytes, err: %v", err)
+		return fuyaoerrors.ErrFailToMarshalData
+	}
+	secret.Data["extra"] = byteExtra
+
+	// save the secret back to the k8s
+	_, err = a.k8sClient.CoreV1().Secrets(a.ns).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	if err != nil {
+		zlog.Errorf("cannot save password to k8s secret, err: %v", err)
+		return fuyaoerrors.ErrFailToPatchSecret
+	}
 
 	return nil
 }
@@ -259,6 +273,12 @@ func (a *FuyaoPasswordAuthenticator) ConfirmPassword(ctx context.Context, userna
 }
 
 func (a *FuyaoPasswordAuthenticator) ResetPassword(ctx context.Context, username, oldPassword, newPassword string) error {
+	// 新旧密码不能相同
+	if oldPassword == newPassword {
+		return fuyaoerrors.ErrPasswordSame
+	}
+
+	// 获取加密后密码
 	_, base64EncryptedOldPassword, err := a.fetchUserInfoAndStoredPassword(username)
 	if err != nil {
 		return err

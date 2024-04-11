@@ -20,6 +20,7 @@ import (
 	"oauth-server/pkg/configs"
 	"oauth-server/pkg/idp/fuyaopassword"
 	"oauth-server/pkg/oauth2"
+	"oauth-server/pkg/protector"
 	"oauth-server/pkg/sessions"
 )
 
@@ -37,7 +38,8 @@ func main() {
 	// prepare all necessary components
 	k8sClient := configs.GetKubernetesClient(nil)
 	idpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	login := fuyaopassword.NewLogin(idpLoginStore, k8sClient, "oauth-user")
+	loginIPProtector := protector.NewDefaultLoginIPProtector()
+	login := fuyaopassword.NewLogin(idpLoginStore, k8sClient, loginIPProtector, "oauth-user")
 	oauthServer := oauth2.NewOAuthServer(idpLoginStore, k8sClient, "oauth-code-token")
 
 	// all routers

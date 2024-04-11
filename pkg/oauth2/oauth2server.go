@@ -36,6 +36,7 @@ import (
 	"oauth-server/pkg/generators"
 	"oauth-server/pkg/sessions"
 	fuyaostore "oauth-server/pkg/store"
+	"oauth-server/pkg/zlog"
 )
 
 var (
@@ -196,6 +197,7 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(w http.ResponseWriter, r 
 	if ok4 && extras["first-login"][0] == "false" {
 		// immediately delete the userinfo
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+			zlog.Errorf("cannot delete the loginstore used in authorization, err: %v", err)
 			return nil, false, err
 		}
 	}

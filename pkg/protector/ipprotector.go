@@ -20,7 +20,7 @@ import (
 type failedLoginTracker struct {
 	locked   bool
 	lockTime time.Time
-	queue    *list.List
+	queue    list.List
 }
 
 type LoginIPProtector struct {
@@ -30,19 +30,27 @@ type LoginIPProtector struct {
 	failDuration time.Duration
 }
 
-func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) {
-	_, ok := p.ipProtector[ip]
-	if !ok {
-		p.ipProtector[ip] = &failedLoginTracker{locked: false}
+func NewDefaultLoginIPProtector() *LoginIPProtector {
+	return &LoginIPProtector{
+		ipProtector:  make(map[string]*failedLoginTracker),
+		lockDuration: time.Minute * 5,
+		failTimes:    5,
+		failDuration: time.Minute * 5,
 	}
+}
+
+func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) {
+	// first make sure the ip-tracker exists
+	p.ensureExistence(ip)
 	p.ipProtector[ip].queue.PushBack(timestamp)
 
-	// Remove events older than failDuration
+	// remove events older than failDuration
 	p.squeezeTracker(ip)
 
 	// determine whether blocking the ip
 	if p.ipProtector[ip].queue.Len() >= p.failTimes {
 		p.ipProtector[ip].lockTime = time.Now()
+		p.ipProtector[ip].locked = true
 	}
 }
 
@@ -52,6 +60,9 @@ func (p *LoginIPProtector) Unlock(ip string) {
 }
 
 func (p *LoginIPProtector) IsLocked(ip string) bool {
+	// first make sure the ip-tracker exists
+	p.ensureExistence(ip)
+
 	// Remove events older than failDuration
 	isLocked := p.ipProtector[ip].locked
 	return isLocked && p.ipProtector[ip].lockTime.Add(p.lockDuration).After(time.Now())
@@ -59,7 +70,7 @@ func (p *LoginIPProtector) IsLocked(ip string) bool {
 
 func (p *LoginIPProtector) squeezeTracker(ip string) {
 	// Remove events older than failDuration
-	failStartTime := time.Now().Add(p.failDuration)
+	failStartTime := time.Now().Add(-1 * p.failDuration)
 
 	for p.ipProtector[ip].queue.Len() > 0 {
 		first := p.ipProtector[ip].queue.Front().Value.(time.Time)
@@ -68,5 +79,12 @@ func (p *LoginIPProtector) squeezeTracker(ip string) {
 		} else {
 			break
 		}
+	}
+}
+
+func (p *LoginIPProtector) ensureExistence(ip string) {
+	_, ok := p.ipProtector[ip]
+	if !ok {
+		p.ipProtector[ip] = &failedLoginTracker{locked: false}
 	}
 }
