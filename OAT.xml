@@ -17,18 +17,18 @@
         <policylist>
             <policy name="projectPolicy">
                 <policyitem type="compatibility" name="MulanPSL-2.0" path=".*"/>
-                <policyitem type="license" name="MulanPSL-2.0" path=".*.go"/>
-                <policyitem type="license" name="MulanPSL-2.0" path=".*.sh"/>
-                <policyitem type="copyright" name="Huawei Technologies Co., Ltd." path=".*.go"/>
-                <policyitem type="copyright" name="Huawei Technologies Co., Ltd." path=".*.sh"/>
-                <policyitem type="filename" name="LICENSE" path=""/>
-                <policyitem type="filetype" name="!binary" path=".*" filefilter="binaryFileTypeFilter"/>
+                <policyitem type="license" name="MulanPSL-2.0" path=".*"/>
+                <policyitem type="copyright" name="Huawei Technologies Co., Ltd." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter"/>
             </policy>
         </policylist>
 
         <filefilterlist>
-            <filefilter name="binaryFileTypeFilter">
-                <filefilteritem type="filepath" name="/LICENSE"/>
+            <filefilter name="defaultFilter" desc="Files not to check">
+                <filteritem type="filename" name="go.mod|go.sum"/>
+                <filteritem type="filename" name="*.yaml"/>
+            </filefilter>
+            <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
+                <filteritem type="filename" name="LICENSE"/>
             </filefilter>
         </filefilterlist>
 
