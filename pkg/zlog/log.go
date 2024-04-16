@@ -14,15 +14,16 @@ package zlog
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/natefinch/lumberjack"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 	defaultLogPath    = "/var/log"
 )
 
+// Logger is the overall logging component
 var Logger *zap.SugaredLogger
 
 var logLevel = map[string]zapcore.Level{
@@ -43,6 +45,7 @@ var logLevel = map[string]zapcore.Level{
 
 var watchOnce = sync.Once{}
 
+// LogConfig configs the logger
 type LogConfig struct {
 	Level       string
 	EncoderType string
@@ -105,6 +108,7 @@ func getDefaultConf() *LogConfig {
 	return defaultConf
 }
 
+// GetLogger inits the logger by config
 func GetLogger(conf *LogConfig) *zap.SugaredLogger {
 	writeSyncer := getLogWriter(conf)
 	encoder := getEncoder(conf)
@@ -147,14 +151,14 @@ func parseConfig() (*LogConfig, error) {
 	return &config, nil
 }
 
-// //获取编码器,NewJSONEncoder()输出json格式，NewConsoleEncoder()输出普通文本格式
+// 获取编码器,NewJSONEncoder()输出json格式，NewConsoleEncoder()输出普通文本格式
 func getEncoder(conf *LogConfig) zapcore.Encoder {
 	encoderConfig := zap.NewProductionEncoderConfig()
-	//指定时间格式 for example: 2021-09-11t20:05:54.852+0800
+	// 指定时间格式 for example: 2021-09-11t20:05:54.852+0800
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	//按级别显示不同颜色，不需要的话取值zapcore.CapitalLevelEncoder就可以了
+	// 按级别显示不同颜色，不需要的话取值zapcore.CapitalLevelEncoder就可以了
 	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	//NewJSONEncoder()输出json格式，NewConsoleEncoder()输出普通文本格式
+	// NewJSONEncoder()输出json格式，NewConsoleEncoder()输出普通文本格式
 	if strings.ToLower(conf.EncoderType) == "json" {
 		return zapcore.NewJSONEncoder(encoderConfig)
 	}
@@ -186,7 +190,7 @@ func getLogWriter(conf *LogConfig) zapcore.WriteSyncer {
 	return zapcore.AddSync(os.Stdout)
 }
 
-//以下封装 SugaredLogger 常用接口
+// 以下封装 SugaredLogger 常用接口
 
 // With adds a variadic number of fields to the logging context. It accepts a
 // mix of strongly-typed Field objects and loosely-typed key-value pairs. When
@@ -285,9 +289,9 @@ func Fatalf(template string, args ...interface{}) {
 // Debugw logs a message with some additional context. The variadic key-value
 // pairs are treated as they are in With.
 //
-// When debug-level logging is disabled, this is much faster than
+// # When debug-level logging is disabled, this is much faster than
 //
-//	s.With(keysAndValues).Debug(msg)
+// s.With(keysAndValues).Debug(msg)
 func Debugw(msg string, keysAndValues ...interface{}) {
 	Logger.Debugw(msg, keysAndValues...)
 }

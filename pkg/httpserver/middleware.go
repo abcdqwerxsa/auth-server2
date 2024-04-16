@@ -10,6 +10,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package httpserver defines the httpserver options and middlewares
 package httpserver
 
 import (
@@ -55,7 +56,7 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 		// 记录访问日志
 		if rl.status >= http.StatusBadRequest {
 			zlog.Warnf(
-				"%s - - [%s] %dms \"%s %s %s\" status:%d length:%d referer:\"%s\" \"%s\"",
+				`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
 				r.RemoteAddr,
 				start.Format("02/Jan/2006:15:04:05 -0700"),
 				time.Since(start)/time.Millisecond,
@@ -69,7 +70,7 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 			)
 		} else {
 			zlog.Infof(
-				"%s - - [%s] %dms \"%s %s %s\" status:%d length:%d referer:\"%s\" \"%s\"",
+				`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
 				r.RemoteAddr,
 				start.Format("02/Jan/2006:15:04:05 -0700"),
 				time.Since(start)/time.Millisecond,

@@ -10,6 +10,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package constants define different genres of constants
 package constants
 
 // Constants for parameters
@@ -23,6 +24,7 @@ const (
 	OriginalPasswordParam = "original_password"
 )
 
+// FuyaoIdpProvider Constants for identity provider
 const (
 	FuyaoIdpProvider = "fuyaoPasswordProvider"
 )

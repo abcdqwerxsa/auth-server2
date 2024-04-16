@@ -10,6 +10,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package configs defines the overall configurations for OAuthServerAPIServer
 package configs
 
 import (
@@ -89,6 +90,7 @@ func (c *OAuthServerAPIServerConfig) Complete() *OAuthServerAPIServerConfig {
 }
 
 // TODO: 每个config是否要有自己的 Complete 和 Validate 呢
+
 // LoginConfig defines all configs used by fuyao login provider
 type LoginConfig struct {
 	Provider      string `json:"Provider"`
@@ -110,10 +112,14 @@ type IPProtectorConfig struct {
 }
 
 func newDefaultIPProtectorConfig() *IPProtectorConfig {
+	const (
+		failDurationMins = 5
+		lockDurationMins = 30
+	)
 	return &IPProtectorConfig{
 		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 30,
+		FailDuration: time.Minute * failDurationMins,
+		LockDuration: time.Minute * lockDurationMins,
 	}
 }
 
@@ -147,11 +153,16 @@ type OAuthServerConfig struct {
 }
 
 func newOAuthServerConfig() *OAuthServerConfig {
+	const (
+		authCodeExpMins      = 5
+		accessTokenExpHours  = 2
+		refreshTokenExpHours = 2
+	)
 	return &OAuthServerConfig{
 		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Minute * 5,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
+		AuthCodeExp:        time.Minute * authCodeExpMins,
+		AccessTokenExp:     time.Hour * accessTokenExpHours,
+		RefreshTokenExp:    time.Hour * refreshTokenExpHours,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
 		JWTPrivateKey:      "i_am_the_secrets",

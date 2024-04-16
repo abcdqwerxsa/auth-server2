@@ -10,16 +10,21 @@
  * See the Mulan PSL v2 for more details.
  */
 
-// Package fuyaopassword implment fuyaoidp login interfaces
+// Package fuyaopassword implements fuyaoidp login interfaces
 package fuyaopassword
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"strings"
+	"text/template"
+	"time"
+
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
-	"net/http"
+
 	"oauth-server/assets/templates"
 	"oauth-server/pkg/authenticators"
 	"oauth-server/pkg/constants"
@@ -28,10 +33,23 @@ import (
 	"oauth-server/pkg/protector"
 	"oauth-server/pkg/sessions"
 	"oauth-server/pkg/zlog"
-	"strings"
-	"text/template"
-	"time"
 )
+
+// LoginForm contains the fields used by fuyao login
+type LoginForm struct {
+	Action    string
+	Then      string
+	CSRFToken string
+}
+
+// OutputHTML writes the contents back to web
+func (l *LoginForm) OutputHTML(w http.ResponseWriter, tpl string, name string) {
+	tplForm := template.Must(template.New(name).Parse(tpl))
+	if err := tplForm.Execute(w, l); err != nil {
+		http.Error(w, fuyaoerrors.ErrStrFailToDisplayLogin, http.StatusInternalServerError)
+		return
+	}
+}
 
 // Login works for fuyao login, implement the login interfaces
 type Login struct {
@@ -42,24 +60,13 @@ type Login struct {
 	loginIPProtector *protector.LoginIPProtector
 }
 
-func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) error {
-	values := sessions.Values{}
-	values[constants.UserName] = user.GetName()
-	values[constants.UserUID] = user.GetUID()
-	values[constants.UserGroups] = user.GetGroups()
-
-	// serialize extra (map[string][]string)
-	jsonExtra, err := json.Marshal(user.GetExtra())
-	if err != nil {
-		zlog.Errorf("cannot marshal data, err: %v", err)
-		return fuyaoerrors.ErrFailToMarshalData
-	}
-	values[constants.UserExtra] = jsonExtra
-	return l.idpLoginStore.Put(w, values)
-}
-
 // NewLogin returns the fuyao Login instance
-func NewLogin(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, loginIPProtector *protector.LoginIPProtector, provider, ns string) *Login {
+func NewLogin(
+	idpLoginStore *sessions.CookieStore,
+	k8sClient kubernetes.Interface,
+	loginIPProtector *protector.LoginIPProtector,
+	provider, ns string,
+) *Login {
 	return &Login{
 		Provider:         provider,
 		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, ns),
@@ -68,21 +75,7 @@ func NewLogin(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interfac
 	}
 }
 
-// LoginForm contains the fields used by fuyao login
-type LoginForm struct {
-	Action    string
-	Then      string
-	CSRFToken string
-}
-
-func (l *LoginForm) OutputHTML(w http.ResponseWriter, tpl string, name string) {
-	tplForm := template.Must(template.New(name).Parse(tpl))
-	if err := tplForm.Execute(w, l); err != nil {
-		http.Error(w, fuyaoerrors.ErrStrFailToDisplayLogin, http.StatusInternalServerError)
-		return
-	}
-}
-
+// LoginHandler deals with both GET/POST requests
 func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// 处理GET请求
@@ -96,7 +89,8 @@ func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (l *Login) FuyaoPasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
+// PasswordConfirmHandler works when the user login for the first time
+func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: 要不这里也先get一次然后再post一次？还是直接让前台处理好get这部分 我先把post的逻辑写在这里
 	// 即使是请求发到了这里，在更改之前还是要检测一下数据库是否已经是首次登陆，不是就要报错
 	// read userinfo from session-store
@@ -134,7 +128,8 @@ func (l *Login) FuyaoPasswordConfirmHandler(w http.ResponseWriter, r *http.Reque
 	http.Redirect(w, r, then, http.StatusFound)
 }
 
-func (l *Login) FuyaoPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
+// PasswordResetHandler resets the password
+func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	// read params from r.url
 	username := r.FormValue(constants.UsernameParam)
 	oldPassword := r.FormValue(constants.OriginalPasswordParam)
@@ -182,7 +177,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// 处理登录表单提交
 	username := r.FormValue(constants.UsernameParam)
 	password := r.FormValue(constants.PasswordParam)
-	//csrfToken := r.FormValue("csrf_token")
+	// csrfToken := r.FormValue("csrf_token")
 	then := r.FormValue(constants.ThenParam)
 
 	// TODO: then 要check是否是当前访问的relative url，不是要重定向到 "/" 这里是不是一定是绝对url
@@ -235,6 +230,22 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// 重定向回到 /oauth/authorize
 	http.Redirect(w, r, then, http.StatusFound)
+}
+
+func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) error {
+	values := sessions.Values{}
+	values[constants.UserName] = user.GetName()
+	values[constants.UserUID] = user.GetUID()
+	values[constants.UserGroups] = user.GetGroups()
+
+	// serialize extra (map[string][]string)
+	jsonExtra, err := json.Marshal(user.GetExtra())
+	if err != nil {
+		zlog.Errorf("cannot marshal data, err: %v", err)
+		return fuyaoerrors.ErrFailToMarshalData
+	}
+	values[constants.UserExtra] = jsonExtra
+	return l.idpLoginStore.Put(w, values)
 }
 
 // ---- util functions ----

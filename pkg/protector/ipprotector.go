@@ -10,12 +10,14 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package protector defines the ip protector plugin
 package protector
 
 import (
 	"container/list"
-	"oauth-server/cmd/oauth-server/app/configs"
 	"time"
+
+	"oauth-server/cmd/oauth-server/app/configs"
 )
 
 type failedLoginTracker struct {
@@ -24,6 +26,7 @@ type failedLoginTracker struct {
 	queue    list.List
 }
 
+// LoginIPProtector is the structure for IPProtector
 type LoginIPProtector struct {
 	ipProtector  map[string]*failedLoginTracker
 	lockDuration time.Duration
@@ -31,6 +34,7 @@ type LoginIPProtector struct {
 	failDuration time.Duration
 }
 
+// NewLoginIPProtector inits LoginIPProtector
 func NewLoginIPProtector(config *configs.IPProtectorConfig) *LoginIPProtector {
 	return &LoginIPProtector{
 		ipProtector:  make(map[string]*failedLoginTracker),
@@ -40,15 +44,7 @@ func NewLoginIPProtector(config *configs.IPProtectorConfig) *LoginIPProtector {
 	}
 }
 
-func NewDefaultLoginIPProtector() *LoginIPProtector {
-	return &LoginIPProtector{
-		ipProtector:  make(map[string]*failedLoginTracker),
-		lockDuration: time.Minute * 5,
-		failTimes:    5,
-		failDuration: time.Minute * 5,
-	}
-}
-
+// AddFailedLogin adds a new failed sample to the ip pool
 func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) {
 	// first make sure the ip-tracker exists
 	p.ensureExistence(ip)
@@ -64,11 +60,13 @@ func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) {
 	}
 }
 
+// Unlock releases the locked ip
 func (p *LoginIPProtector) Unlock(ip string) {
 	p.ipProtector[ip].locked = false
 	p.ipProtector[ip].lockTime = time.Time{}
 }
 
+// IsLocked checks whether ip is locked
 func (p *LoginIPProtector) IsLocked(ip string) bool {
 	// first make sure the ip-tracker exists
 	p.ensureExistence(ip)
@@ -83,7 +81,10 @@ func (p *LoginIPProtector) squeezeTracker(ip string) {
 	failStartTime := time.Now().Add(-1 * p.failDuration)
 
 	for p.ipProtector[ip].queue.Len() > 0 {
-		first := p.ipProtector[ip].queue.Front().Value.(time.Time)
+		first, ok := p.ipProtector[ip].queue.Front().Value.(time.Time)
+		if !ok {
+			continue
+		}
 		if first.Before(failStartTime) {
 			p.ipProtector[ip].queue.Remove(p.ipProtector[ip].queue.Front())
 		} else {

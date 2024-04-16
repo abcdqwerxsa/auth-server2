@@ -10,10 +10,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package options store the configfile and will possibly extend other datastructures (genericapiserver) in the future
 package options
 
 import (
 	"github.com/spf13/viper"
+
 	"oauth-server/cmd/oauth-server/app/configs"
 	"oauth-server/pkg/fuyaoerrors"
 )

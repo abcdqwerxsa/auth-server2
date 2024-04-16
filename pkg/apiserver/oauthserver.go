@@ -10,6 +10,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package apiserver inits all the necessary components
 package apiserver
 
 import (
@@ -35,7 +36,10 @@ type OAuthServerAPIServer struct {
 }
 
 // NewOAuthServerAPIServer inits a new oauthserver apiserver
-func NewOAuthServerAPIServer(cfg *overallconfigs.OAuthServerAPIServerConfig, stopCh <-chan struct{}) (*OAuthServerAPIServer, error) {
+func NewOAuthServerAPIServer(
+	cfg *overallconfigs.OAuthServerAPIServerConfig,
+	stopCh <-chan struct{},
+) (*OAuthServerAPIServer, error) {
 	// init httpserver
 	server, err := httpserver.NewHttpServer(cfg.HttpServerConfig)
 	if err != nil {
@@ -66,8 +70,8 @@ func NewOAuthServerAPIServer(cfg *overallconfigs.OAuthServerAPIServerConfig, sto
 func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
 	s.Router.HandleFunc("/auth/login/fuyaoPasswordProvider", s.Login.LoginHandler)
-	s.Router.HandleFunc("/auth/password/confirm/fuyaoPasswordProvider", s.Login.FuyaoPasswordConfirmHandler)
-	s.Router.HandleFunc("/auth/password/modify/fuyaoPasswordProvider", s.Login.FuyaoPasswordResetHandler)
+	s.Router.HandleFunc("/auth/password/confirm/fuyaoPasswordProvider", s.Login.PasswordConfirmHandler)
+	s.Router.HandleFunc("/auth/password/modify/fuyaoPasswordProvider", s.Login.PasswordResetHandler)
 	s.Router.HandleFunc("/oauth/authorize", s.OAuthServer.OAuth2AuthorizeHandler)
 	s.Router.HandleFunc("/oauth/token", s.OAuthServer.OAuth2TokenHandler)
 	return nil
@@ -80,7 +84,8 @@ func (s *OAuthServerAPIServer) Run(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
-		_ = s.Server.Shutdown(shutdownCtx)
+		err := s.Server.Shutdown(shutdownCtx)
+		zlog.Errorf("server shuts down, err: %v", err)
 	}()
 
 	zlog.Infof("Start listening on %s", s.Server.Addr)

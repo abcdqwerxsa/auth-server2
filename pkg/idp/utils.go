@@ -18,6 +18,7 @@ import (
 	"os"
 )
 
+// GetBaseURL get the base url of http request
 func GetBaseURL(req *http.Request) (*url.URL, error) {
 	uri, err := url.Parse(req.RequestURI)
 	if err != nil {

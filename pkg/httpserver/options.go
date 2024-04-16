@@ -10,16 +10,18 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package httpserver defines the httpserver options and middlewares
 package httpserver
 
 import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"os"
+
 	"oauth-server/pkg/constants"
 	"oauth-server/pkg/fuyaoerrors"
 	"oauth-server/pkg/zlog"
-	"os"
 )
 
 // ServerOptions defines the configs for httpserver

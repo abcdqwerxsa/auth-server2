@@ -15,11 +15,13 @@ package main
 import (
 	"k8s.io/component-base/cli"
 	"oauth-server/cmd/oauth-server/app"
-	"os"
+	"oauth-server/pkg/zlog"
 )
 
 func main() {
 	cmd := app.NewOAuthServerCommand()
 	code := cli.Run(cmd)
-	os.Exit(code)
+	if code != 0 {
+		zlog.Fatalf("Application exited with error code: %d", code)
+	}
 }

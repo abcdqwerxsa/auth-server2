@@ -10,6 +10,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package fuyaoerrors define all formatted errors
 package fuyaoerrors
 
 import (
@@ -18,6 +19,7 @@ import (
 )
 
 const (
+	// ErrStrFailToDisplayLogin and belows are internal runtime errors string
 	ErrStrFailToDisplayLogin           = "unable to display login page"
 	ErrStrUsernameOrPasswordMissing    = "missing username or password in the post request"
 	ErrStrFailToParseForm              = "cannot parse the form"
@@ -37,19 +39,20 @@ const (
 	ErrStrNotFirstLogin                = "this user is not the first time logging in, please go to the login page"
 	ErrStrNotLogin                     = "user not logged in, unauthorized to do anything"
 	ErrStrLoginBlocked                 = "request is blocked due to multiple failed login attempts"
-	// httpserver errors
+	// ErrStrInvalidHttpAndHttpsPort and belows are httpserver errors string
 	ErrStrInvalidHttpAndHttpsPort = "http and https port cannot be invalid at the same time"
 	ErrStrEmptyCertFile           = "the tls cert file is empty to serve https requests"
 	ErrStrEmptyPrivateKeyFile     = "the tls private key file is empty to serve https requests"
 	ErrStrEmptyMasterCAFile       = "the master CA file is empty to serve https requests"
 	ErrStrFailToLoadCert          = "the cert and private key does not match"
-	// oauthServerOption errors
+	// ErrStrOAuthServerConfigFileMissing and belows are oauthServerOption errors string
 	ErrStrOAuthServerConfigFileMissing = "the configfile is missing to start the httpserver"
 	ErrStrJWTPrivateKeyMissing         = "the JWT private key is missing to start the httpserver"
 	ErrStrHttpServerConfigMissing      = "the config is incomplete to start the server"
 )
 
 var (
+	// ErrFailToDisplayLogin and belows are internal runtime errors
 	ErrFailToDisplayLogin           = errors.New(ErrStrFailToDisplayLogin)
 	ErrUsernameOrPasswordMissing    = errors.New(ErrStrUsernameOrPasswordMissing)
 	ErrFailToParseForm              = errors.New(ErrStrFailToParseForm)
@@ -69,19 +72,20 @@ var (
 	ErrNotFirstLogin                = errors.New(ErrStrNotFirstLogin)
 	ErrNotLogin                     = errors.New(ErrStrNotLogin)
 	ErrLoginBlocked                 = errors.New(ErrStrLoginBlocked)
-	// httpserver errors
+	// ErrInvalidHttpAndHttpsPort and belows are httpserver errors
 	ErrInvalidHttpAndHttpsPort = errors.New(ErrStrInvalidHttpAndHttpsPort)
 	ErrEmptyCertFile           = errors.New(ErrStrEmptyCertFile)
 	ErrEmptyPrivateKeyFile     = errors.New(ErrStrEmptyPrivateKeyFile)
 	ErrEmptyMasterCAFile       = errors.New(ErrStrEmptyMasterCAFile)
 	ErrFailToLoadCert          = errors.New(ErrStrFailToLoadCert)
 	ErrIntExitSignal           = 255
-	// oauthServerOption errors
+	// ErrOAuthServerConfigFileMissing and belows are oauthServerOption errors
 	ErrOAuthServerConfigFileMissing = errors.New(ErrStrOAuthServerConfigFileMissing)
 	ErrJWTPrivateKeyMissing         = errors.New(ErrStrJWTPrivateKeyMissing)
 	ErrHttpServerConfigMissing      = errors.New(ErrStrHttpServerConfigMissing)
 )
 
+// ErrStatusCode is the mapper from error to http return error
 var ErrStatusCode = map[error]int{
 	ErrFailToDisplayLogin:           http.StatusInternalServerError,
 	ErrUsernameOrPasswordMissing:    http.StatusBadRequest,

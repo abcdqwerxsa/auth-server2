@@ -10,12 +10,17 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package oauth2
 package oauth2
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+
 	"github.com/go-oauth2/oauth2/v4"
 	oauth2errors "github.com/go-oauth2/oauth2/v4/errors"
 	"github.com/go-oauth2/oauth2/v4/generates"
@@ -27,9 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
-	"log"
-	"net/http"
-	"net/url"
+
 	oauthconfigs "oauth-server/cmd/oauth-server/app/configs"
 	"oauth-server/pkg/constants"
 	"oauth-server/pkg/fuyaoerrors"
@@ -39,11 +42,13 @@ import (
 	"oauth-server/pkg/zlog"
 )
 
+// FuyaoAuthorizeRequest extends the original AuthorizeRequest in go-oauth2
 type FuyaoAuthorizeRequest struct {
 	server.AuthorizeRequest
 	identityProvider string
 }
 
+// FuyaoAuthorizeServer extends the original authorize server in go-oauth2
 type FuyaoAuthorizeServer struct {
 	// 继承并重写部分接口
 	*server.Server
@@ -51,14 +56,20 @@ type FuyaoAuthorizeServer struct {
 	idpLoginStore *sessions.CookieStore
 }
 
-func NewFuyaoAuthorizeServer(cfg *server.Config, manager oauth2.Manager, idpLoginStore *sessions.CookieStore) *FuyaoAuthorizeServer {
+// NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer
+func NewFuyaoAuthorizeServer(
+	cfg *server.Config,
+	manager oauth2.Manager,
+	idpLoginStore *sessions.CookieStore,
+) *FuyaoAuthorizeServer {
 	return &FuyaoAuthorizeServer{
-		server.NewServer(cfg, manager),
+		Server: server.NewServer(cfg, manager),
 		// TODO: set this through config
-		idpLoginStore,
+		idpLoginStore: idpLoginStore,
 	}
 }
 
+// HandleAuthorizeRequest the main handler for /oauth/authorize
 func (s *FuyaoAuthorizeServer) HandleAuthorizeRequest(w http.ResponseWriter, r *http.Request) error {
 	// 这个就是本质的使用对象，我这里只需要重写这个函数应该就没问题了
 	// fetch params
@@ -86,25 +97,7 @@ func (s *FuyaoAuthorizeServer) HandleAuthorizeRequest(w http.ResponseWriter, r *
 		}
 		return nil
 	}
-
-	//// specify the scope of authorization
-	//if fn := s.AuthorizeScopeHandler; fn != nil {
-	//	scope, err := fn(w, r)
-	//	if err != nil {
-	//		return err
-	//	} else if scope != "" {
-	//		req.Scope = scope
-	//	}
-	//}
-	//
-	//// specify the expiration time of access token
-	//if fn := s.AccessTokenExpHandler; fn != nil {
-	//	exp, err := fn(w, r)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	req.AccessTokenExp = exp
-	//}
+	// TODO: specify scope of authorization and the expiration time of access token
 
 	// generate the oauth code 在把code 存储到etcd的同时也要存入用户信息，这样在token接口使用code就可以从etcd中获取用户信息等
 	req.UserID = userResponse.User.GetName()
@@ -126,7 +119,12 @@ func (s *FuyaoAuthorizeServer) HandleAuthorizeRequest(w http.ResponseWriter, r *
 	return s.redirect(w, req, s.GetAuthorizeData(req.ResponseType, ti))
 }
 
-func (s *FuyaoAuthorizeServer) RedirectToLogin(req *FuyaoAuthorizeRequest, w http.ResponseWriter, r *http.Request) error {
+// RedirectToLogin redirects to login page when sessionId is missing
+func (s *FuyaoAuthorizeServer) RedirectToLogin(
+	req *FuyaoAuthorizeRequest,
+	w http.ResponseWriter,
+	r *http.Request,
+) error {
 	// TODO: maybe we have multiple internal idps in the future
 	if req.identityProvider != constants.FuyaoIdpProvider {
 		return fuyaoerrors.ErrIdentityProviderIncorrect
@@ -141,8 +139,6 @@ func (s *FuyaoAuthorizeServer) RedirectToLogin(req *FuyaoAuthorizeRequest, w htt
 }
 
 func buildLoginRedirectURL(r *http.Request, idp string) (*url.URL, error) {
-	// 原始 URL
-	//originalURL := "https://oauth-openshift.apps.my-ocp-cluster.com/oauth/authorize?client_id=console&idp=my_htpasswd_provider&redirect_uri=https%3A%2F%2Fconsole-openshift-console.apps.my-ocp-cluster.com%2Fauth%2Fcallback&response_type=code&scope=user%3Afull&state=3c0476b9"
 	originalURL := r.URL
 
 	redirectURL := &url.URL{
@@ -160,6 +156,7 @@ func buildLoginRedirectURL(r *http.Request, idp string) (*url.URL, error) {
 	return redirectURL, nil
 }
 
+// ValidationAuthorizeRequest makes sure the request params do not miss necessary params
 func (s *FuyaoAuthorizeServer) ValidationAuthorizeRequest(r *http.Request) (*FuyaoAuthorizeRequest, error) {
 	// original call
 	req, err := s.Server.ValidationAuthorizeRequest(r)
@@ -179,7 +176,11 @@ func (s *FuyaoAuthorizeServer) ValidationAuthorizeRequest(r *http.Request) (*Fuy
 	}, nil
 }
 
-func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(w http.ResponseWriter, r *http.Request) (*authenticator.Response, bool, error) {
+// AuthorizeThroughSession authorize the user with session stored data
+func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
+	w http.ResponseWriter,
+	r *http.Request,
+) (*authenticator.Response, bool, error) {
 	// fetch the cached user info
 	cookieData := s.idpLoginStore.Get(r)
 
@@ -212,6 +213,7 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(w http.ResponseWriter, r 
 
 }
 
+// GetErrorData forms the error return data for oauth2.0
 func (s *FuyaoAuthorizeServer) GetErrorData(err error) (map[string]interface{}, int, http.Header) {
 	// deal with incorrect identity_provider error
 	if errors.Is(err, fuyaoerrors.ErrIdentityProviderIncorrect) {
@@ -243,7 +245,11 @@ func (s *FuyaoAuthorizeServer) redirectError(w http.ResponseWriter, req *FuyaoAu
 	return s.redirect(w, req, data)
 }
 
-func (s *FuyaoAuthorizeServer) redirect(w http.ResponseWriter, req *FuyaoAuthorizeRequest, data map[string]interface{}) error {
+func (s *FuyaoAuthorizeServer) redirect(
+	w http.ResponseWriter,
+	req *FuyaoAuthorizeRequest,
+	data map[string]interface{},
+) error {
 	uri, err := s.GetRedirectURI(&req.AuthorizeRequest, data)
 	if err != nil {
 		return err
@@ -254,23 +260,29 @@ func (s *FuyaoAuthorizeServer) redirect(w http.ResponseWriter, req *FuyaoAuthori
 	return nil
 }
 
-func NewOAuthServer(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, cfg *oauthconfigs.OAuthServerConfig) *FuyaoAuthorizeServer {
+// NewOAuthServer inits the go-oauth2 oauth server
+func NewOAuthServer(
+	idpLoginStore *sessions.CookieStore,
+	k8sClient kubernetes.Interface,
+	cfg *oauthconfigs.OAuthServerConfig,
+) *FuyaoAuthorizeServer {
 	manager := manage.NewDefaultManager()
 	// 这里可能需要后续把这些config单独拿出来
 	// 设置access_token 和 authorization_code 的超时时间
-	manager.SetAuthorizeCodeTokenCfg(&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp, IsGenerateRefresh: cfg.IsGenerateRefresh})
-
+	manager.SetAuthorizeCodeTokenCfg(
+		&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp,
+			IsGenerateRefresh: cfg.IsGenerateRefresh})
 	manager.SetAuthorizeCodeExp(cfg.AuthCodeExp)
 	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
 
 	// token store
 	manager.MustTokenStorage(store.NewMemoryTokenStore())
-
 	// generate jwt access token
 	// TODO: 这个要以配置的方式拆解出去
-	manager.MapAccessGenerate(generates.NewJWTAccessGenerate(cfg.JWTKeyID, []byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
-	//manager.MapAccessGenerate(generates.NewAccessGenerate())
-	//
+	manager.MapAccessGenerate(
+		generates.NewJWTAccessGenerate(cfg.JWTKeyID, []byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
+	// manager.MapAccessGenerate(generates.NewAccessGenerate())
+
 	// TODO: 这里的id和secret是不是要改成可以配置的，所有需要走oauth2的client都要在这里配置一下
 	clientStore := store.NewClientStore()
 	for client, secret := range cfg.ClientMapper {
@@ -279,20 +291,16 @@ func NewOAuthServer(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.In
 			Secret: secret,
 		})
 	}
-
 	// TODO: 这个manager是否要重新new一个新的
 	manager.MapClientStorage(clientStore)
-
 	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, cfg.CodeTokenNamespace)
 	manager.MapTokenStorage(tokenStore)
 
 	srv := NewFuyaoAuthorizeServer(server.NewConfig(), manager, idpLoginStore)
-
 	srv.SetInternalErrorHandler(func(err error) (re *oauth2errors.Response) {
 		log.Println("Internal Error:", err.Error())
 		return
 	})
-
 	srv.SetResponseErrorHandler(func(re *oauth2errors.Response) {
 		log.Println("Response Error:", re.Error.Error())
 	})
@@ -304,6 +312,7 @@ func NewOAuthServer(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.In
 	return srv
 }
 
+// OAuth2AuthorizeHandler http handler for /oauth/authorize
 func (s *FuyaoAuthorizeServer) OAuth2AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	if err := s.HandleAuthorizeRequest(w, r); err != nil {
 		// TODO: 错误处理
@@ -311,6 +320,7 @@ func (s *FuyaoAuthorizeServer) OAuth2AuthorizeHandler(w http.ResponseWriter, r *
 	// TODO: 考虑把redirect部分拿出来？
 }
 
+// OAuth2TokenHandler http handler for /oauth/token
 func (s *FuyaoAuthorizeServer) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 	if err := s.HandleTokenRequest(w, r); err != nil {
 		// TODO: 错误处理
@@ -318,6 +328,7 @@ func (s *FuyaoAuthorizeServer) OAuth2TokenHandler(w http.ResponseWriter, r *http
 	// TODO: 考虑把redirect部分拿出来？
 }
 
+// HandleTokenRequest the main handler for /oauth/token
 func (s *FuyaoAuthorizeServer) HandleTokenRequest(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -339,7 +350,12 @@ func (s *FuyaoAuthorizeServer) tokenError(w http.ResponseWriter, err error) erro
 	return s.token(w, data, header, statusCode)
 }
 
-func (s *FuyaoAuthorizeServer) token(w http.ResponseWriter, data map[string]interface{}, header http.Header, statusCode ...int) error {
+func (s *FuyaoAuthorizeServer) token(
+	w http.ResponseWriter,
+	data map[string]interface{},
+	header http.Header,
+	statusCode ...int,
+) error {
 	if fn := s.ResponseTokenHandler; fn != nil {
 		return fn(w, data, header, statusCode...)
 	}

@@ -95,8 +95,9 @@ func TestPBKDF2Encryptor_VerifyPassword(t *testing.T) {
 				encryptMethod: sha256.New,
 			},
 			args{
-				rawPassword:       "soup4@LL",
-				encryptedPassword: "mR7xeqbBN3G632b19xRrM2CcOEJUWDTp2+uYFt6yu0af0kB34HcUZur1dKEdrRf/E7hA8+k7F51zQ9cFVBzBezYdw6esAgxOse3oZv6LLoc=",
+				"soup4@LL",
+				"mR7xeqbBN3G632b19xRrM2CcOEJUWDTp2+uYFt6yu0af0kB34HcUZur1dKEdrRf/E7h" +
+					"A8+k7F51zQ9cFVBzBezYdw6esAgxOse3oZv6LLoc=",
 			},
 			true,
 			false,

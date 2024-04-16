@@ -10,17 +10,20 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package configs configure the oauth2-server defined in go-oauth2
 package configs
 
 import (
+	"os"
+	"os/user"
+	"path"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+
 	"oauth-server/pkg/zlog"
-	"os"
-	"os/user"
-	"path"
 )
 
 // KubernetesConfig specifies the configuration for k8s client
@@ -36,7 +39,7 @@ type KubernetesConfig struct {
 }
 
 // NewKubernetesConfig 返回默认的 k8s 相关配置（如KubeConfig）
-func NewKubernetesConfig() (option *KubernetesConfig) {
+func NewKubernetesConfig() *KubernetesConfig {
 	return &KubernetesConfig{
 		KubeConfigFile: getDefaultKubeConfigFile(),
 		QPS:            1e6,
@@ -103,6 +106,7 @@ func GetKubeConfigOrInClusterConfig(k8sConfig *KubernetesConfig) (clientConfig *
 	return clientConfig
 }
 
+// GetKubernetesClient returns the k8sClient with k8sConfig
 func GetKubernetesClient(k8sConfig *KubernetesConfig) kubernetes.Interface {
 	kubeConfig := GetKubeConfigOrInClusterConfig(k8sConfig)
 	k8sClient, err := kubernetes.NewForConfig(kubeConfig)

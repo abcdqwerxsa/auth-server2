@@ -10,15 +10,15 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package generators generates auth codes / access tokens
 package generators
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
-	"github.com/go-oauth2/oauth2/v4"
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/go-oauth2/oauth2/v4"
+	"github.com/go-oauth2/oauth2/v4/generates"
 )
 
 // NewFuyaoAuthorizeGenerate create to generate the authorize code instance
@@ -27,15 +27,17 @@ func NewFuyaoAuthorizeGenerate() *FuyaoAuthorizeGenerate {
 }
 
 // FuyaoAuthorizeGenerate generate the authorize code
-type FuyaoAuthorizeGenerate struct{}
+type FuyaoAuthorizeGenerate struct {
+	generates.AuthorizeGenerate
+}
 
-// Token based on the UUID generated token
+// Token based on the UUID generated token, returns lowercase letters
 func (ag *FuyaoAuthorizeGenerate) Token(ctx context.Context, data *oauth2.GenerateBasic) (string, error) {
-	buf := bytes.NewBufferString(data.Client.GetID())
-	buf.WriteString(data.UserID)
-	token := uuid.NewMD5(uuid.Must(uuid.NewRandom()), buf.Bytes())
-	code := base64.URLEncoding.EncodeToString([]byte(token.String()))
-	code = strings.ToLower(strings.TrimRight(code, "="))
+	code, err := ag.AuthorizeGenerate.Token(ctx, data)
+	if err != nil {
+		return "", err
+	}
+	code = strings.ToLower(code)
 
 	return code, nil
 }

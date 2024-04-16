@@ -16,14 +16,15 @@ import (
 	"context"
 	"errors"
 	"github.com/spf13/cobra"
-	genericapiserver "k8s.io/apiserver/pkg/server"
 	"net/http"
+
+	genericapiserver "k8s.io/apiserver/pkg/server"
+
 	"oauth-server/cmd/oauth-server/app/configs"
 	"oauth-server/cmd/oauth-server/app/options"
 	"oauth-server/pkg/apiserver"
 	"oauth-server/pkg/fuyaoerrors"
 	"oauth-server/pkg/zlog"
-	"os"
 )
 
 // NewOAuthServerCommand is the cobra command for the whole service
@@ -47,7 +48,7 @@ func NewOAuthServerCommand() *cobra.Command {
 				for _, err = range errs {
 					zlog.Error(err)
 				}
-				os.Exit(fuyaoerrors.ErrIntExitSignal)
+				zlog.Fatal(fuyaoerrors.ErrIntExitSignal)
 			}
 
 			return wrapRunOAuthServerServer(oAuthAPIServerConfigs, genericapiserver.SetupSignalContext())
@@ -75,7 +76,8 @@ func wrapRunOAuthServerServer(c *configs.OAuthServerAPIServerConfig, ctx context
 	}()
 
 	// The ctx (signals.SetupSignalHandler()) is to control the entire program life cycle,
-	// The ictx(internal context)  is created here to control the life cycle of the ks-apiserver(http httpserver, sharedInformer etc.)
+	// The ictx(internal context)  is created here to control the life cycle of the
+	// ks-apiserver(http httpserver, sharedInformer etc.)
 	// when config change, stop httpserver and renew context, start new httpserver
 	for {
 		select {

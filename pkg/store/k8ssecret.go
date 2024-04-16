@@ -10,23 +10,27 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package store defines how to store the auth code and access token
 package store
 
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"time"
+
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/models"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
 	"oauth-server/pkg/constants"
 	"oauth-server/pkg/fuyaoerrors"
 	"oauth-server/pkg/zlog"
-	"strings"
-	"time"
 )
 
+// K8sSecretStore is the k8sSecret store interface
 type K8sSecretStore struct {
 	// k8s client
 	k8sClient kubernetes.Interface
@@ -34,6 +38,7 @@ type K8sSecretStore struct {
 	ns string
 }
 
+// NewK8sSecretStore inits a new K8sSecretStore
 func NewK8sSecretStore(k8sClient kubernetes.Interface, ns string) *K8sSecretStore {
 	return &K8sSecretStore{
 		k8sClient: k8sClient,
@@ -41,6 +46,7 @@ func NewK8sSecretStore(k8sClient kubernetes.Interface, ns string) *K8sSecretStor
 	}
 }
 
+// Create creates a new code/access-token/refresh-token
 func (s *K8sSecretStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
 	if code := info.GetCode(); code != "" {
 		return s.createByCode(ctx, info)
@@ -129,6 +135,7 @@ func (s *K8sSecretStore) createByRefresh(ctx context.Context, info oauth2.TokenI
 	return fuyaoerrors.ErrNotImplemented
 }
 
+// RemoveByCode removes the auth-code
 func (s *K8sSecretStore) RemoveByCode(ctx context.Context, code string) error {
 	name := constants.CodePrefix + code
 	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(ctx, name, metav1.DeleteOptions{})
@@ -140,6 +147,7 @@ func (s *K8sSecretStore) RemoveByCode(ctx context.Context, code string) error {
 	return nil
 }
 
+// RemoveByAccess removes the access-token
 func (s *K8sSecretStore) RemoveByAccess(ctx context.Context, access string) error {
 	name := refactorSecretName(constants.AccessPrefix + access)
 	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(ctx, name, metav1.DeleteOptions{})
@@ -151,10 +159,12 @@ func (s *K8sSecretStore) RemoveByAccess(ctx context.Context, access string) erro
 	return nil
 }
 
+// RemoveByRefresh removes the refresh-token
 func (s *K8sSecretStore) RemoveByRefresh(ctx context.Context, refresh string) error {
 	return fuyaoerrors.ErrNotImplemented
 }
 
+// GetByCode gets the auth-code data
 func (s *K8sSecretStore) GetByCode(ctx context.Context, code string) (oauth2.TokenInfo, error) {
 	// get the secret
 	name := constants.CodePrefix + code
@@ -168,6 +178,7 @@ func (s *K8sSecretStore) GetByCode(ctx context.Context, code string) (oauth2.Tok
 	return s.decodeUserInfo(userdata.Data["userinfo"])
 }
 
+// GetByAccess gets the access-token data
 func (s *K8sSecretStore) GetByAccess(ctx context.Context, access string) (oauth2.TokenInfo, error) {
 	// get the secret
 	name := refactorSecretName(constants.AccessPrefix + access)
@@ -181,6 +192,7 @@ func (s *K8sSecretStore) GetByAccess(ctx context.Context, access string) (oauth2
 	return s.decodeUserInfo(userdata.Data["userinfo"])
 }
 
+// GetByRefresh gets the refresh-token data
 func (s *K8sSecretStore) GetByRefresh(ctx context.Context, refresh string) (oauth2.TokenInfo, error) {
 	return nil, fuyaoerrors.ErrNotImplemented
 }
