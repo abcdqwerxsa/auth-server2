@@ -30,18 +30,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"oauth-server/pkg/configs"
+	oauthconfigs "oauth-server/cmd/oauth-server/app/configs"
 	"oauth-server/pkg/constants"
 	"oauth-server/pkg/fuyaoerrors"
 	"oauth-server/pkg/generators"
 	"oauth-server/pkg/sessions"
 	fuyaostore "oauth-server/pkg/store"
 	"oauth-server/pkg/zlog"
-)
-
-var (
-	manager     *manage.Manager
-	clientStore *store.ClientStore
 )
 
 type FuyaoAuthorizeRequest struct {
@@ -259,12 +254,13 @@ func (s *FuyaoAuthorizeServer) redirect(w http.ResponseWriter, req *FuyaoAuthori
 	return nil
 }
 
-func NewOAuthServer(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, ns string) *FuyaoAuthorizeServer {
-	manager = manage.NewDefaultManager()
+func NewOAuthServer(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, cfg *oauthconfigs.OAuthServerConfig) *FuyaoAuthorizeServer {
+	manager := manage.NewDefaultManager()
 	// 这里可能需要后续把这些config单独拿出来
 	// 设置access_token 和 authorization_code 的超时时间
-	manager.SetAuthorizeCodeTokenCfg(configs.DefaultAuthorizeCodeTokenCfg)
-	manager.SetAuthorizeCodeExp(configs.DefaultCodeExp)
+	manager.SetAuthorizeCodeTokenCfg(&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp, IsGenerateRefresh: cfg.IsGenerateRefresh})
+
+	manager.SetAuthorizeCodeExp(cfg.AuthCodeExp)
 	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
 
 	// token store
@@ -272,20 +268,22 @@ func NewOAuthServer(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.In
 
 	// generate jwt access token
 	// TODO: 这个要以配置的方式拆解出去
-	manager.MapAccessGenerate(generates.NewJWTAccessGenerate("access_token_sign_key", []byte("i_am_the_secrets"), jwt.SigningMethodHS512))
+	manager.MapAccessGenerate(generates.NewJWTAccessGenerate(cfg.JWTKeyID, []byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
 	//manager.MapAccessGenerate(generates.NewAccessGenerate())
 	//
 	// TODO: 这里的id和secret是不是要改成可以配置的，所有需要走oauth2的client都要在这里配置一下
-	clientStore = store.NewClientStore()
-	clientStore.Set("console", &models.Client{
-		ID:     "console",
-		Secret: "console-password",
-	})
+	clientStore := store.NewClientStore()
+	for client, secret := range cfg.ClientMapper {
+		clientStore.Set(client, &models.Client{
+			ID:     client,
+			Secret: secret,
+		})
+	}
 
 	// TODO: 这个manager是否要重新new一个新的
 	manager.MapClientStorage(clientStore)
 
-	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, ns)
+	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, cfg.CodeTokenNamespace)
 	manager.MapTokenStorage(tokenStore)
 
 	srv := NewFuyaoAuthorizeServer(server.NewConfig(), manager, idpLoginStore)

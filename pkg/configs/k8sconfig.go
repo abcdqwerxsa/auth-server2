@@ -26,13 +26,13 @@ import (
 // KubernetesConfig specifies the configuration for k8s client
 type KubernetesConfig struct {
 	// KubeConfigFile defines the path to fetch kubeconfig
-	KubeConfigFile string `json:"kubeConfigFile" yaml:"kubeConfigFile"`
+	KubeConfigFile string `json:"KubeConfigFile" yaml:"KubeConfigFile"`
 
 	// QPS is kubernetes clientset qps
-	QPS float32 `json:"qps,omitempty" yaml:"qps,omitempty"`
+	QPS float32 `json:"QPS,omitempty" yaml:"QPS,omitempty"`
 
 	// Burst is kubernetes clientset burst
-	Burst int `json:"burst,omitempty" yaml:"burst,omitempty"`
+	Burst int `json:"Burst,omitempty" yaml:"Burst,omitempty"`
 }
 
 // NewKubernetesConfig 返回默认的 k8s 相关配置（如KubeConfig）

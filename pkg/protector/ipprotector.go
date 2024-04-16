@@ -14,6 +14,7 @@ package protector
 
 import (
 	"container/list"
+	"oauth-server/cmd/oauth-server/app/configs"
 	"time"
 )
 
@@ -28,6 +29,15 @@ type LoginIPProtector struct {
 	lockDuration time.Duration
 	failTimes    int
 	failDuration time.Duration
+}
+
+func NewLoginIPProtector(config *configs.IPProtectorConfig) *LoginIPProtector {
+	return &LoginIPProtector{
+		ipProtector:  make(map[string]*failedLoginTracker),
+		lockDuration: config.LockDuration,
+		failTimes:    config.FailTimes,
+		failDuration: config.FailDuration,
+	}
 }
 
 func NewDefaultLoginIPProtector() *LoginIPProtector {

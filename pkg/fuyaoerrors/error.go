@@ -37,6 +37,16 @@ const (
 	ErrStrNotFirstLogin                = "this user is not the first time logging in, please go to the login page"
 	ErrStrNotLogin                     = "user not logged in, unauthorized to do anything"
 	ErrStrLoginBlocked                 = "request is blocked due to multiple failed login attempts"
+	// httpserver errors
+	ErrStrInvalidHttpAndHttpsPort = "http and https port cannot be invalid at the same time"
+	ErrStrEmptyCertFile           = "the tls cert file is empty to serve https requests"
+	ErrStrEmptyPrivateKeyFile     = "the tls private key file is empty to serve https requests"
+	ErrStrEmptyMasterCAFile       = "the master CA file is empty to serve https requests"
+	ErrStrFailToLoadCert          = "the cert and private key does not match"
+	// oauthServerOption errors
+	ErrStrOAuthServerConfigFileMissing = "the configfile is missing to start the httpserver"
+	ErrStrJWTPrivateKeyMissing         = "the JWT private key is missing to start the httpserver"
+	ErrStrHttpServerConfigMissing      = "the config is incomplete to start the server"
 )
 
 var (
@@ -59,6 +69,17 @@ var (
 	ErrNotFirstLogin                = errors.New(ErrStrNotFirstLogin)
 	ErrNotLogin                     = errors.New(ErrStrNotLogin)
 	ErrLoginBlocked                 = errors.New(ErrStrLoginBlocked)
+	// httpserver errors
+	ErrInvalidHttpAndHttpsPort = errors.New(ErrStrInvalidHttpAndHttpsPort)
+	ErrEmptyCertFile           = errors.New(ErrStrEmptyCertFile)
+	ErrEmptyPrivateKeyFile     = errors.New(ErrStrEmptyPrivateKeyFile)
+	ErrEmptyMasterCAFile       = errors.New(ErrStrEmptyMasterCAFile)
+	ErrFailToLoadCert          = errors.New(ErrStrFailToLoadCert)
+	ErrIntExitSignal           = 255
+	// oauthServerOption errors
+	ErrOAuthServerConfigFileMissing = errors.New(ErrStrOAuthServerConfigFileMissing)
+	ErrJWTPrivateKeyMissing         = errors.New(ErrStrJWTPrivateKeyMissing)
+	ErrHttpServerConfigMissing      = errors.New(ErrStrHttpServerConfigMissing)
 )
 
 var ErrStatusCode = map[error]int{

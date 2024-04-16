@@ -59,9 +59,9 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 }
 
 // NewLogin returns the fuyao Login instance
-func NewLogin(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, loginIPProtector *protector.LoginIPProtector, ns string) *Login {
+func NewLogin(idpLoginStore *sessions.CookieStore, k8sClient kubernetes.Interface, loginIPProtector *protector.LoginIPProtector, provider, ns string) *Login {
 	return &Login{
-		Provider:         "fuyaoPaswordProvider",
+		Provider:         provider,
 		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, ns),
 		idpLoginStore:    idpLoginStore,
 		loginIPProtector: loginIPProtector,

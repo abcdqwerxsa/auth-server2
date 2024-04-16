@@ -48,3 +48,9 @@ const (
 	PasswordMinLen = 8
 	PasswordMaxLen = 32
 )
+
+// Constants for http port range
+const (
+	MinHttpPort = 0
+	MaxHttpPort = 65536
+)
