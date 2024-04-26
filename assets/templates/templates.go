@@ -22,8 +22,8 @@ const (
     <meta charset="UTF-8">
     <title>Login</title>
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
-    <script src="//code.jquery.com/jquery-2.2.4.min.js"></script>
     <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    <script src="//code.jquery.com/jquery-2.2.4.min.js"></script>
 </head>
 
 <body>
@@ -31,12 +31,12 @@ const (
     <h1>Login In</h1>
     <form action="{{.Action}}" method="POST">
         <div class="form-group">
-            <label for="username">User Name</label>
-            <input type="text" class="form-control" name="username" required placeholder="Please enter your user name">
+            <label for="username">OpenFuyao User</label>
+            <input type="text" class="form-control" name="username" required placeholder="Enter username">
         </div>
         <div class="form-group">
             <label for="password">Password</label>
-            <input type="password" class="form-control" name="password" placeholder="Please enter your password">
+            <input type="password" class="form-control" name="password" required placeholder="Enter password">
         </div>
         <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
         <input type="hidden" name="then" value="{{.Then}}">

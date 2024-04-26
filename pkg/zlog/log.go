@@ -10,6 +10,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package zlog encapsulate the log interfaces
 package zlog
 
 import (
@@ -27,8 +28,8 @@ import (
 )
 
 const (
-	defaultConfigPath = "/etc/fuyao-servicemesh"
-	defaultConfigName = "fuyao-servicemesh"
+	defaultConfigPath = "/etc/oauth-server"
+	defaultConfigName = "oauth-server"
 	defaultConfigType = "yaml"
 	defaultLogPath    = "/var/log"
 )
@@ -45,7 +46,7 @@ var logLevel = map[string]zapcore.Level{
 
 var watchOnce = sync.Once{}
 
-// LogConfig configs the logger
+// LogConfig config the logger
 type LogConfig struct {
 	Level       string
 	EncoderType string
@@ -73,9 +74,6 @@ func loadConfig() (*LogConfig, error) {
 	viper.AddConfigPath(defaultConfigPath)
 	viper.SetConfigName(defaultConfigName)
 	viper.SetConfigType(defaultConfigType)
-
-	// 添加当前根目录，仅用于debug，打包构建时请勿开启
-	// viper.AddConfigPath(".")
 
 	config, err := parseConfig()
 	if err != nil {
@@ -190,189 +188,150 @@ func getLogWriter(conf *LogConfig) zapcore.WriteSyncer {
 	return zapcore.AddSync(os.Stdout)
 }
 
-// 以下封装 SugaredLogger 常用接口
-
-// With adds a variadic number of fields to the logging context. It accepts a
-// mix of strongly-typed Field objects and loosely-typed key-value pairs. When
-// processing pairs, the first element of the pair is used as the field key
-// and the second as the field value.
-func With(args ...interface{}) *zap.SugaredLogger {
+// WithLogFields adds fields to the logging context.
+func WithLogFields(args ...interface{}) *zap.SugaredLogger {
 	return Logger.With(args...)
 }
 
-// Debug logs the provided arguments at [DebugLevel].
-// Spaces are added between arguments when neither is a string.
-func Debug(args ...interface{}) {
+// LogDebug logs at DebugLevel.
+func LogDebug(args ...interface{}) {
 	Logger.Debug(args...)
 }
 
-// Info logs the provided arguments at [].
-// Spaces are added between arguments when neither is a string.
-func Info(args ...interface{}) {
+// LogInfo logs at InfoLevel.
+func LogInfo(args ...interface{}) {
 	Logger.Info(args...)
 }
 
-// Warn logs the provided arguments at [WarnLevel].
-// Spaces are added between arguments when neither is a string.
-func Warn(args ...interface{}) {
+// LogWarn logs at WarnLevel.
+func LogWarn(args ...interface{}) {
 	Logger.Warn(args...)
 }
 
-// Error logs the provided arguments at [ErrorLevel].
-// Spaces are added between arguments when neither is a string.
-func Error(args ...interface{}) {
+// LogError Error logs at ErrorLevel.
+func LogError(args ...interface{}) {
 	Logger.Error(args...)
 }
 
-// DPanic logs the provided arguments at [DPanicLevel].
-// In development, the logger then panics. (See [DPanicLevel] for details.)
-// Spaces are added between arguments when neither is a string.
-func DPanic(args ...interface{}) {
+// LogDPanic logs at DPanicLevel.
+func LogDPanic(args ...interface{}) {
 	Logger.DPanic(args...)
 }
 
-// Panic constructs a message with the provided arguments and panics.
-// Spaces are added between arguments when neither is a string.
-func Panic(args ...interface{}) {
+// LogPanic logs at PanicLevel.
+func LogPanic(args ...interface{}) {
 	Logger.Panic(args...)
 }
 
-// Fatal constructs a message with the provided arguments and calls os.Exit.
-// Spaces are added between arguments when neither is a string.
-func Fatal(args ...interface{}) {
+// LogFatal logs at FatalLevel.
+func LogFatal(args ...interface{}) {
 	Logger.Fatal(args...)
 }
 
-// Debugf formats the message according to the format specifier
-// and logs it at [DebugLevel].
-func Debugf(template string, args ...interface{}) {
+// LogDebugf logs a formatted message at DebugLevel.
+func LogDebugf(template string, args ...interface{}) {
 	Logger.Debugf(template, args...)
 }
 
-// Infof formats the message according to the format specifier
-// and logs it at [].
-func Infof(template string, args ...interface{}) {
+// LogInfof logs a formatted message at InfoLevel.
+func LogInfof(template string, args ...interface{}) {
 	Logger.Infof(template, args...)
 }
 
-// Warnf formats the message according to the format specifier
-// and logs it at [WarnLevel].
-func Warnf(template string, args ...interface{}) {
+// LogWarnf logs a formatted message at WarnLevel.
+func LogWarnf(template string, args ...interface{}) {
 	Logger.Warnf(template, args...)
 }
 
-// Errorf formats the message according to the format specifier
-// and logs it at [ErrorLevel].
-func Errorf(template string, args ...interface{}) {
+// LogErrorf logs a formatted message at ErrorLevel.
+func LogErrorf(template string, args ...interface{}) {
 	Logger.Errorf(template, args...)
 }
 
-// DPanicf formats the message according to the format specifier
-// and logs it at [DPanicLevel].
-// In development, the logger then panics. (See [DPanicLevel] for details.)
-func DPanicf(template string, args ...interface{}) {
+// LogDPanicf logs a formatted message at DPanicLevel.
+func LogDPanicf(template string, args ...interface{}) {
 	Logger.DPanicf(template, args...)
 }
 
-// Panicf formats the message according to the format specifier
-// and panics.
-func Panicf(template string, args ...interface{}) {
+// LogPanicf logs a formatted message at PanicLevel.
+func LogPanicf(template string, args ...interface{}) {
 	Logger.Panicf(template, args...)
 }
 
-// Fatalf formats the message according to the format specifier
-// and calls os.Exit.
-func Fatalf(template string, args ...interface{}) {
+// LogFatalf logs a formatted message at FatalLevel.
+func LogFatalf(template string, args ...interface{}) {
 	Logger.Fatalf(template, args...)
 }
 
-// Debugw logs a message with some additional context. The variadic key-value
-// pairs are treated as they are in With.
-//
-// # When debug-level logging is disabled, this is much faster than
-//
-// s.With(keysAndValues).Debug(msg)
-func Debugw(msg string, keysAndValues ...interface{}) {
+// LogDebugw logs a message with some additional context.
+func LogDebugw(msg string, keysAndValues ...interface{}) {
 	Logger.Debugw(msg, keysAndValues...)
 }
 
-// Infow logs a message with some additional context. The variadic key-value
-// pairs are treated as they are in With.
-func Infow(msg string, keysAndValues ...interface{}) {
+// LogInfow logs a message with some additional context.
+func LogInfow(msg string, keysAndValues ...interface{}) {
 	Logger.Infow(msg, keysAndValues...)
 }
 
-// Warnw logs a message with some additional context. The variadic key-value
-// pairs are treated as they are in With.
-func Warnw(msg string, keysAndValues ...interface{}) {
+// LogWarnw logs a message with some additional context.
+func LogWarnw(msg string, keysAndValues ...interface{}) {
 	Logger.Warnw(msg, keysAndValues...)
 }
 
-// Errorw logs a message with some additional context. The variadic key-value
-// pairs are treated as they are in With.
-func Errorw(msg string, keysAndValues ...interface{}) {
+// LogErrorw logs a message with some additional context.
+func LogErrorw(msg string, keysAndValues ...interface{}) {
 	Logger.Errorw(msg, keysAndValues...)
 }
 
-// DPanicw logs a message with some additional context. In development, the
-// logger then panics. (See DPanicLevel for details.) The variadic key-value
-// pairs are treated as they are in With.
-func DPanicw(msg string, keysAndValues ...interface{}) {
+// LogDPanicw logs a message with some additional context. In development, the
+// logger then panics. (See DPanicLevel for details.)
+func LogDPanicw(msg string, keysAndValues ...interface{}) {
 	Logger.DPanicw(msg, keysAndValues...)
 }
 
-// Panicw logs a message with some additional context, then panics. The
-// variadic key-value pairs are treated as they are in With.
-func Panicw(msg string, keysAndValues ...interface{}) {
+// LogPanicw logs a message with some additional context, then panics.
+func LogPanicw(msg string, keysAndValues ...interface{}) {
 	Logger.Panicw(msg, keysAndValues...)
 }
 
-// Fatalw logs a message with some additional context, then calls os.Exit. The
-// variadic key-value pairs are treated as they are in With.
-func Fatalw(msg string, keysAndValues ...interface{}) {
+// LogFatalw logs a message with some additional context, then calls os.Exit.
+func LogFatalw(msg string, keysAndValues ...interface{}) {
 	Logger.Fatalw(msg, keysAndValues...)
 }
 
-// Debugln logs a message at [DebugLevel].
-// Spaces are always added between arguments.
-func Debugln(args ...interface{}) {
+// LogDebugln logs a message at [DebugLevel].
+func LogDebugln(args ...interface{}) {
 	Logger.Debugln(args...)
 }
 
-// Infoln logs a message at [].
-// Spaces are always added between arguments.
-func Infoln(args ...interface{}) {
+// LogInfoln logs a message at [InfoLevel].
+func LogInfoln(args ...interface{}) {
 	Logger.Infoln(args...)
 }
 
-// Warnln logs a message at [WarnLevel].
-// Spaces are always added between arguments.
-func Warnln(args ...interface{}) {
+// LogWarnln logs a message at [WarnLevel].
+func LogWarnln(args ...interface{}) {
 	Logger.Warnln(args...)
 }
 
-// Errorln logs a message at [ErrorLevel].
-// Spaces are always added between arguments.
-func Errorln(args ...interface{}) {
+// LogErrorln logs a message at [ErrorLevel].
+func LogErrorln(args ...interface{}) {
 	Logger.Errorln(args...)
 }
 
-// DPanicln logs a message at [DPanicLevel].
+// LogDPanicln logs a message at [DPanicLevel].
 // In development, the logger then panics. (See [DPanicLevel] for details.)
-// Spaces are always added between arguments.
-func DPanicln(args ...interface{}) {
+func LogDPanicln(args ...interface{}) {
 	Logger.DPanicln(args...)
 }
 
-// Panicln logs a message at [PanicLevel] and panics.
-// Spaces are always added between arguments.
-func Panicln(args ...interface{}) {
+// LogPanicln logs a message at [PanicLevel] and panics.
+func LogPanicln(args ...interface{}) {
 	Logger.Panicln(args...)
 }
 
-// Fatalln logs a message at [FatalLevel] and calls os.Exit.
-// Spaces are always added between arguments.
-func Fatalln(args ...interface{}) {
+// LogFatalln logs a message at [FatalLevel] and calls os.Exit.
+func LogFatalln(args ...interface{}) {
 	Logger.Fatalln(args...)
 }
 

@@ -14,14 +14,15 @@ package main
 
 import (
 	"k8s.io/component-base/cli"
-	"oauth-server/cmd/oauth-server/app"
-	"oauth-server/pkg/zlog"
+
+	"openfuyao/oauth-server/cmd/oauth-server/app"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 func main() {
 	cmd := app.NewOAuthServerCommand()
 	code := cli.Run(cmd)
 	if code != 0 {
-		zlog.Fatalf("Application exited with error code: %d", code)
+		zlog.LogFatalf("Application exited with error code: %d", code)
 	}
 }

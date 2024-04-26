@@ -16,8 +16,8 @@ package options
 import (
 	"github.com/spf13/viper"
 
-	"oauth-server/cmd/oauth-server/app/configs"
-	"oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
 )
 
 // OAuthServerOption stores the overall configfile and its loading method for the whole oauthserver service
@@ -40,14 +40,14 @@ func (o *OAuthServerOption) Validate() error {
 }
 
 // ReadConfig loads the configfile from disk
-func (o *OAuthServerOption) ReadConfig() (*configs.OAuthServerAPIServerConfig, error) {
+func (o *OAuthServerOption) ReadConfig() (*config.OAuthServerAPIServerConfig, error) {
 	v := viper.New()
 	v.SetConfigFile(o.ConfigFile)
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}
 
-	var oAuthServerConfig configs.OAuthServerAPIServerConfig
+	var oAuthServerConfig config.OAuthServerAPIServerConfig
 	if err := v.Unmarshal(&oAuthServerConfig); err != nil {
 		return nil, err
 	}

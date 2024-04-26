@@ -25,14 +25,14 @@ import (
 	"unicode"
 
 	"golang.org/x/crypto/pbkdf2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
 
-	"oauth-server/pkg/constants"
-	"oauth-server/pkg/fuyaoerrors"
-	"oauth-server/pkg/zlog"
+	"openfuyao/oauth-server/pkg/constants"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // PasswordAuthenticator in an authenticator that uses username/password to verify identities
@@ -44,12 +44,8 @@ type PasswordAuthenticator interface {
 
 // FuyaoPasswordAuthenticator is the default password authenticator for fuyao-oauth-server
 type FuyaoPasswordAuthenticator struct {
-	// 这里需要加上一些 client-go 方便与 secret 交互
-	// session 的交互先不要放在这里
-	// session-store 实现，这个是存储用户是否已经通过账户密码登录的接口
 	k8sClient kubernetes.Interface
 	ns        string
-	// TODO: should we let users configure the encryptor
 	encryptor Encryptor
 }
 
@@ -65,26 +61,26 @@ func NewFuyaoPasswordAuthenticator(k8sClient kubernetes.Interface, namespace str
 // AuthenticatePassword authenticates the password
 func (a *FuyaoPasswordAuthenticator) AuthenticatePassword(
 	ctx context.Context,
-	username, password string,
+	username, passwd string,
 ) (*authenticator.Response, bool, error) {
-	// 取出旧 password 将 password 加密并比较
+	// fetch old password
 	userinfo, base64EncryptedPassword, err := a.fetchUserInfoAndStoredPassword(username)
 	if err != nil {
 		return nil, false, err
 	}
 
 	// verify the input password
-	if ok, err := a.encryptor.VerifyPassword(password, base64EncryptedPassword); !ok || err != nil {
+	if ok, err := a.encryptor.VerifyPassword(passwd, base64EncryptedPassword); !ok || err != nil {
 		return nil, false, err
 	}
 
 	return &authenticator.Response{User: userinfo}, true, nil
 }
 
-func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, password string) bool {
+func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, passwd string) bool {
 	// check password length
-	if len(password) < constants.PasswordMinLen || len(password) > constants.PasswordMaxLen {
-		zlog.Error("the password length should lie between 8 and 32")
+	if len(passwd) < constants.PasswordMinLen || len(passwd) > constants.PasswordMaxLen {
+		zlog.LogError("the password length should lie between 8 and 32")
 		return false
 	}
 
@@ -95,7 +91,7 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, password 
 		hasDigit     bool
 		hasSpecial   bool
 	)
-	for _, char := range password {
+	for _, char := range passwd {
 		switch {
 		case unicode.IsLower(char):
 			hasLowercase = true
@@ -111,20 +107,19 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, password 
 	}
 
 	if !hasLowercase || !hasUppercase || !hasDigit || !hasSpecial {
-		zlog.Error("密码必须包含至少一个小写字母、一个大写字母、一个数字和一个特殊字符")
+		zlog.LogError("密码必须包含至少一个小写字母、一个大写字母、一个数字和一个特殊字符")
 		return false
 	}
 
 	// check whether the password is contained in username / reversed username
-	if strings.Contains(password, username) || strings.Contains(password, reverseString(username)) {
-		zlog.Error("密码不能和账号及账号逆序一样")
+	if strings.Contains(passwd, username) || strings.Contains(passwd, reverseString(username)) {
+		zlog.LogError("密码不能和账号及账号逆序一样")
 		return false
 	}
 
 	return true
 }
 
-// 反转字符串
 func reverseString(s string) string {
 	var reversed string
 	for _, char := range s {
@@ -135,9 +130,9 @@ func reverseString(s string) string {
 
 func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username string) (user.Info, string, error) {
 	// get the secret
-	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, metav1.GetOptions{})
+	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
 	if err != nil {
-		zlog.Errorf("cannot get the password secret for %s, err: %v", username, err)
+		zlog.LogErrorf("cannot get the password secret for %s, err: %v", username, err)
 		return nil, "", fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
@@ -179,7 +174,7 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 func readStringFromSecretData(secretData map[string][]byte, key string) (string, error) {
 	base64Data, ok := secretData[key]
 	if !ok {
-		zlog.Errorf("the base64 secretData %s is missing in the secret", key)
+		zlog.LogErrorf("the base64 secretData %s is missing in the secret", key)
 		return "", fuyaoerrors.ErrLoginServiceDown
 	}
 
@@ -189,25 +184,25 @@ func readStringFromSecretData(secretData map[string][]byte, key string) (string,
 func readExtraFromSecretData(secretData map[string][]byte, key string) (map[string][]string, error) {
 	base64Data, ok := secretData[key]
 	if !ok {
-		zlog.Errorf("the base64 secretData %s is missing in the secret", key)
+		zlog.LogErrorf("the base64 secretData %s is missing in the secret", key)
 		return nil, fuyaoerrors.ErrLoginServiceDown
 	}
 
 	var extra map[string][]string
 	err := json.Unmarshal(base64Data, &extra)
 	if err != nil {
-		zlog.Errorf("unmarshaling secretData goes wrong for key %s, err: %v", key, err)
+		zlog.LogErrorf("unmarshaling secretData goes wrong for key %s, err: %v", key, err)
 		return nil, fuyaoerrors.ErrLoginServiceDown
 	}
 
 	return extra, err
 }
 
-func (a *FuyaoPasswordAuthenticator) savePassword(username, password string, firstLogin bool) error {
+func (a *FuyaoPasswordAuthenticator) savePassword(username, passwd string, firstLogin bool) error {
 	// get the secret
-	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, metav1.GetOptions{})
+	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
 	if err != nil {
-		zlog.Errorf("cannot get the password secret for %s, err: %v", username, err)
+		zlog.LogErrorf("cannot get the password secret for %s, err: %v", username, err)
 		return fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
@@ -222,12 +217,12 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, password string, fir
 	}
 	storedFirstLogin := firstLoginField[0]
 	if firstLogin && storedFirstLogin == "false" {
-		zlog.Errorf("the user has already logged in and changed the password, cannot reconfirm it")
+		zlog.LogErrorf("the user has already logged in and changed the password, cannot reconfirm it")
 		return fuyaoerrors.ErrNotFirstLogin
 	}
 
 	// encrypt the password
-	encryptedPassword, err := a.encryptor.EncryptPassword(password)
+	encryptedPassword, err := a.encryptor.EncryptPassword(passwd)
 	if err != nil {
 		return fuyaoerrors.ErrLoginServiceDown
 	}
@@ -237,15 +232,15 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, password string, fir
 	extra["first-login"][0] = "false"
 	byteExtra, err := json.Marshal(extra)
 	if err != nil {
-		zlog.Errorf("fail to marshal extra bytes, err: %v", err)
+		zlog.LogErrorf("fail to marshal extra bytes, err: %v", err)
 		return fuyaoerrors.ErrFailToMarshalData
 	}
 	secret.Data["extra"] = byteExtra
 
 	// save the secret back to the k8s
-	_, err = a.k8sClient.CoreV1().Secrets(a.ns).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	_, err = a.k8sClient.CoreV1().Secrets(a.ns).Update(context.TODO(), secret, v1.UpdateOptions{})
 	if err != nil {
-		zlog.Errorf("cannot save password to k8s secret, err: %v", err)
+		zlog.LogErrorf("cannot save password to k8s secret, err: %v", err)
 		return fuyaoerrors.ErrFailToPatchSecret
 	}
 
@@ -301,7 +296,7 @@ func (a *FuyaoPasswordAuthenticator) ResetPassword(
 	return nil
 }
 
-// Encryptor manages the encrypt and decrypt funcs & configs
+// Encryptor manages the encrypt and decrypt funcs & config
 type Encryptor interface {
 	VerifyPassword(newPassword, encryptedOldPassword string) (bool, error)
 	EncryptPassword(rawPassword string) (string, error)

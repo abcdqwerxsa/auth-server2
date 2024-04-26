@@ -24,17 +24,16 @@ func GetBaseURL(req *http.Request) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	uri.Scheme, uri.Host, uri.RawQuery, uri.Fragment = req.URL.Scheme, req.URL.Host, "", ""
+	uri.Scheme, uri.Host = req.URL.Scheme, req.URL.Host
+	uri.RawQuery, uri.Fragment = "", ""
 	return uri, nil
 }
 
 func readFileToString(filename string) (string, error) {
-	// 读取文件内容
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return "", err
 	}
 
-	// 将读取的内容转换为字符串并返回
 	return string(data), nil
 }

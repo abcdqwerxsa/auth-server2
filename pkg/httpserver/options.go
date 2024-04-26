@@ -15,22 +15,23 @@ package httpserver
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"os"
 
-	"oauth-server/pkg/constants"
-	"oauth-server/pkg/fuyaoerrors"
-	"oauth-server/pkg/zlog"
+	"openfuyao/oauth-server/pkg/constants"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
-// ServerOptions defines the configs for httpserver
+// ServerOptions defines the config for httpserver
 type ServerOptions struct {
 	HttpPort          int    `json:"HttpPort"`
 	HttpsPort         int    `json:"HttpsPort"`
 	TlsCertFile       string `json:"TlsCertFile"`
 	TlsPrivateKeyFile string `json:"TlsPrivateKeyFile"`
-	MasterCAFile      string `json:"MasterCAFile"`
+	RootCAFile        string `json:"RootCAFile"`
 }
 
 // NewDefaultHttpServerOptions inits the default httpserver option
@@ -40,7 +41,7 @@ func NewDefaultHttpServerOptions() *ServerOptions {
 		HttpsPort:         0,
 		TlsCertFile:       "",
 		TlsPrivateKeyFile: "",
-		MasterCAFile:      "",
+		RootCAFile:        "",
 	}
 }
 
@@ -68,10 +69,10 @@ func (s *ServerOptions) Validate() []error {
 			}
 		}
 
-		if s.MasterCAFile != "" {
+		if s.RootCAFile != "" {
 			errs = append(errs, fuyaoerrors.ErrEmptyMasterCAFile)
 		} else {
-			if _, err := os.Stat(s.MasterCAFile); err != nil {
+			if _, err := os.Stat(s.RootCAFile); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -85,18 +86,31 @@ func NewHttpServer(options *ServerOptions) (*http.Server, error) {
 	server := &http.Server{Addr: fmt.Sprintf(":%d", options.HttpPort)}
 
 	if options.HttpsPort != 0 {
+		// load server.key and server.crt
 		certificate, err := tls.LoadX509KeyPair(options.TlsCertFile, options.TlsPrivateKeyFile)
 		if err != nil {
-			zlog.Errorf("%s, err: %v", fuyaoerrors.ErrStrFailToLoadCert, err)
+			zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToLoadCert, err)
 			return nil, fuyaoerrors.ErrFailToLoadCert
 		}
 
+		// load RootCA
+		caCert, err := os.ReadFile(options.RootCAFile)
+		if err != nil {
+			zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToLoadCert, err)
+			return nil, fuyaoerrors.ErrFailToLoadCert
+		}
+
+		// create the cert pool
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		// configure the tls
 		server.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{certificate},
+			ClientAuth:   tls.RequestClientCert,
+			ClientCAs:    caCertPool,
 		}
 		server.Addr = fmt.Sprintf(":%d", options.HttpsPort)
-
-		// TODO: set root CA
 	}
 
 	return server, nil

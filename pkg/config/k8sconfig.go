@@ -10,8 +10,8 @@
  * See the Mulan PSL v2 for more details.
  */
 
-// Package configs configure the oauth2-server defined in go-oauth2
-package configs
+// Package config configure the oauth2-server defined in go-oauth2
+package config
 
 import (
 	"os"
@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
-	"oauth-server/pkg/zlog"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // KubernetesConfig specifies the configuration for k8s client
@@ -47,6 +47,13 @@ func NewKubernetesConfig() *KubernetesConfig {
 	}
 }
 
+// Validate validate kubernetesConfig
+func (k *KubernetesConfig) Validate() []error {
+	var errs []error
+	// since we have rest.InclusterConfig, the KubeConfigFile is allowed to be empty here, no validation is set
+	return errs
+}
+
 func getDefaultKubeConfigFile() string {
 	kubeConfigFile := ""
 	homePath := homedir.HomeDir()
@@ -56,11 +63,12 @@ func getDefaultKubeConfigFile() string {
 		}
 	}
 
-	// TODO: maybe change it to /var/run/secrets/kubernetes.io/serviceaccount
+	// here use the node kubeconfig for debugging
 	userHomeConfig := path.Join(homePath, ".kube/config")
 	if _, err := os.Stat(userHomeConfig); err == nil {
 		kubeConfigFile = userHomeConfig
 	}
+
 	return kubeConfigFile
 }
 
@@ -70,28 +78,29 @@ func GetKubeConfigOrInClusterConfig(k8sConfig *KubernetesConfig) (clientConfig *
 	var err error
 	if k8sConfig != nil && len(k8sConfig.KubeConfigFile) > 0 {
 		clientConfig, err = clientcmd.BuildConfigFromFlags("", k8sConfig.KubeConfigFile)
-		if err != nil {
+		if err == nil {
 			return clientConfig
 		}
 	}
 
 	if k8sConfig == nil {
+		// make sure we have qps and burst fields
 		k8sConfig = NewKubernetesConfig()
 	}
 
 	clientConfig, err = rest.InClusterConfig()
 	if err != nil {
-		zlog.Warn("Get KubeConfig In Cluster Config error, Attempting to obtain from the default configuration file")
+		zlog.LogWarn("Get KubeConfig In Cluster Config error, Attempting to obtain from the default configu file")
 		kubeConfigFile := getDefaultKubeConfigFile()
 		if kubeConfigFile == "" {
-			zlog.Fatalf("Error creating in-cluster config: %v", err)
+			zlog.LogFatalf("Error creating in-cluster config: %v", err)
 		}
 		if _, err = os.Stat(kubeConfigFile); err != nil {
-			zlog.Fatalf("Error creating in-filePath config: %v", err)
+			zlog.LogFatalf("Error creating in-filePath config: %v", err)
 		}
 		clientConfig, err = clientcmd.BuildConfigFromFlags("", kubeConfigFile)
 		if err != nil {
-			zlog.Fatalf("Error creating k8s config")
+			zlog.LogFatalf("Error creating k8s config")
 		}
 	}
 
@@ -111,7 +120,7 @@ func GetKubernetesClient(k8sConfig *KubernetesConfig) kubernetes.Interface {
 	kubeConfig := GetKubeConfigOrInClusterConfig(k8sConfig)
 	k8sClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		zlog.Fatalf("Error converting k8s config to k8sclient")
+		zlog.LogFatalf("Error converting k8s config to k8sclient")
 	}
 
 	return k8sClient

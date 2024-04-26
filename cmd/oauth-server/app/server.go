@@ -15,16 +15,16 @@ package app
 import (
 	"context"
 	"errors"
-	"github.com/spf13/cobra"
 	"net/http"
 
-	genericapiserver "k8s.io/apiserver/pkg/server"
+	"github.com/spf13/cobra"
+	"k8s.io/apiserver/pkg/server"
 
-	"oauth-server/cmd/oauth-server/app/configs"
-	"oauth-server/cmd/oauth-server/app/options"
-	"oauth-server/pkg/apiserver"
-	"oauth-server/pkg/fuyaoerrors"
-	"oauth-server/pkg/zlog"
+	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/cmd/oauth-server/app/options"
+	"openfuyao/oauth-server/pkg/apiserver"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // NewOAuthServerCommand is the cobra command for the whole service
@@ -36,22 +36,22 @@ func NewOAuthServerCommand() *cobra.Command {
 		Short: "The authentication server to validate the access token.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := options.Validate(); err != nil {
-				zlog.Fatal(err)
+				zlog.LogFatal(err)
 			}
 
 			oAuthAPIServerConfigs, err := options.ReadConfig()
 			if err != nil {
-				zlog.Fatal(err)
+				zlog.LogFatal(err)
 			}
 
 			if errs := oAuthAPIServerConfigs.Complete().Validate(); len(errs) != 0 {
 				for _, err = range errs {
-					zlog.Error(err)
+					zlog.LogError(err)
 				}
-				zlog.Fatal(fuyaoerrors.ErrIntExitSignal)
+				zlog.LogFatal(fuyaoerrors.ErrIntExitSignal)
 			}
 
-			return wrapRunOAuthServerServer(oAuthAPIServerConfigs, genericapiserver.SetupSignalContext())
+			return wrapRunOAuthServerServer(oAuthAPIServerConfigs, server.SetupSignalContext())
 		},
 		SilenceUsage: true,
 	}
@@ -65,7 +65,7 @@ func NewOAuthServerCommand() *cobra.Command {
 	return cmd
 }
 
-func wrapRunOAuthServerServer(c *configs.OAuthServerAPIServerConfig, ctx context.Context) error {
+func wrapRunOAuthServerServer(c *config.OAuthServerAPIServerConfig, ctx context.Context) error {
 	innerCtx, cancelFunc := context.WithCancel(context.TODO())
 	errCh := make(chan error)
 	defer close(errCh)
@@ -84,20 +84,6 @@ func wrapRunOAuthServerServer(c *configs.OAuthServerAPIServerConfig, ctx context
 		case <-ctx.Done():
 			cancelFunc()
 			return nil
-		//case cfg := <-configCh:
-		//	cancelFunc()
-		//	s.ConfigFile = &cfg
-		//	ictx, cancelFunc = context.WithCancel(context.TODO())
-		//	go func() {
-		//		if errs := s.Complete().Validate(); len(errs) != 0 {
-		//			for _, err := range errs {
-		//				errCh <- err
-		//			}
-		//		}
-		//		if err := runOAuthServer(s, ictx); err != nil {
-		//			errCh <- err
-		//		}
-		//	}()
 		case err := <-errCh:
 			cancelFunc()
 			return err
@@ -105,7 +91,7 @@ func wrapRunOAuthServerServer(c *configs.OAuthServerAPIServerConfig, ctx context
 	}
 }
 
-func runOAuthServerServer(c *configs.OAuthServerAPIServerConfig, ctx context.Context) error {
+func runOAuthServerServer(c *config.OAuthServerAPIServerConfig, ctx context.Context) error {
 	oAuthServerAPIServer, err := apiserver.NewOAuthServerAPIServer(c, ctx.Done())
 	if err != nil {
 		return err

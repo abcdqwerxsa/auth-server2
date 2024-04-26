@@ -16,7 +16,7 @@ package constants
 // Constants for parameters
 const (
 	ThenParam     = "then"
-	CSRFParam     = "csrf"
+	CSRFParam     = "csrf_token"
 	UsernameParam = "username"
 	PasswordParam = "password"
 

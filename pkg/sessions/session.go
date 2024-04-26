@@ -10,16 +10,17 @@
  * See the Mulan PSL v2 for more details.
  */
 
+// Package sessions define the store backend for sessions
 package sessions
 
 import (
 	"encoding/json"
 	"net/http"
 
-	gorilla "github.com/gorilla/sessions"
+	"github.com/gorilla/sessions"
 
-	"oauth-server/pkg/constants"
-	"oauth-server/pkg/zlog"
+	"openfuyao/oauth-server/pkg/constants"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // CookieStore defines the session store structure
@@ -27,18 +28,15 @@ type CookieStore struct {
 	// name of the cookie used for session data
 	name string
 	// store of the actual cookie
-	store gorilla.Store
+	store sessions.Store
 }
 
 // NewSessionStore inits a session store for idp login state
 func NewSessionStore(name string, maxAge int, secrets ...[]byte) *CookieStore {
-	cookie := gorilla.NewCookieStore(secrets...)
-	// we encode expiration information into the cookie data to avoid browser bugs
-	// since we do not set the Expires or Max-Age attributes, all cookies created by this store are session cookies
+	cookie := sessions.NewCookieStore(secrets...)
 	cookie.Options.MaxAge = maxAge
-	// TODO: change to false for debugging, in production changing these two to true
-	cookie.Options.HttpOnly = false
-	cookie.Options.Secure = false
+	cookie.Options.HttpOnly = true
+	cookie.Options.Secure = true
 	return &CookieStore{name: name, store: cookie}
 }
 
@@ -47,10 +45,8 @@ func (s *CookieStore) Get(r *http.Request) Values {
 	// always use New to avoid global state
 	session, err := s.store.New(r, s.name)
 	if err != nil {
-		// ignore all errors
-		// log the error in case we ever need to know that it is occurring
-		// we do not log the request as that could leak sensitive information such as the cookie
-		zlog.Errorf("failed to decode secure session cookie %s: %v", s.name, err)
+		// just log the error so that we can know what is going on
+		zlog.LogErrorf("failed to decode secure cookie session %s: %v", s.name, err)
 
 		return make(map[interface{}]interface{})
 	}
@@ -59,8 +55,7 @@ func (s *CookieStore) Get(r *http.Request) Values {
 
 // Put stores the new cookie value to response writer
 func (s *CookieStore) Put(w http.ResponseWriter, v Values) error {
-	// build a session from an empty request to avoid any decoding overhead
-	// always use New to avoid global state
+	// using a new request
 	r := &http.Request{}
 	session, err := s.store.New(r, s.name)
 	if err != nil {
@@ -80,18 +75,28 @@ type Values map[interface{}]interface{}
 // GetString fetches string value from the session store
 func (v Values) GetString(key string) (string, bool) {
 	str, ok := v[key].(string)
+	if !ok {
+		return "", false
+	}
 	return str, ok && len(str) != 0
 }
 
 // GetInt64 fetches int from the session store
 func (v Values) GetInt64(key string) (int64, bool) {
 	i, ok := v[key].(int64)
+	if !ok {
+		return 0, false
+	}
 	return i, ok && i != 0
 }
 
 // GetArrayString fetches array string from the session store
 func (v Values) GetArrayString(key string) ([]string, bool) {
+	var arrayStr []string
 	arrayStr, ok := v[key].([]string)
+	if !ok {
+		return arrayStr, false
+	}
 	return arrayStr, ok && arrayStr != nil
 }
 

@@ -25,9 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"oauth-server/pkg/constants"
-	"oauth-server/pkg/fuyaoerrors"
-	"oauth-server/pkg/zlog"
+	"openfuyao/oauth-server/pkg/constants"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // K8sSecretStore is the k8sSecret store interface
@@ -65,7 +65,7 @@ func (s *K8sSecretStore) createByCode(ctx context.Context, info oauth2.TokenInfo
 	currentTime := time.Now()
 	info.SetCodeCreateAt(currentTime)
 	if exp := info.GetCodeExpiresIn(); exp == 0 {
-		zlog.Warn("the oauth code expiration time is not set")
+		zlog.LogWarn("the oauth code expiration time is not set")
 	}
 
 	// serialize the info
@@ -88,7 +88,7 @@ func (s *K8sSecretStore) createByCode(ctx context.Context, info oauth2.TokenInfo
 	// create the secret
 	_, err = s.k8sClient.CoreV1().Secrets(s.ns).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
-		zlog.Errorf("cannot create code secret %s, err: %v", info.GetCode(), err)
+		zlog.LogErrorf("cannot create code secret %s, err: %v", info.GetCode(), err)
 		return fuyaoerrors.ErrFailToCreateSecret
 	}
 
@@ -100,7 +100,7 @@ func (s *K8sSecretStore) createByAccess(ctx context.Context, info oauth2.TokenIn
 	currentTime := time.Now()
 	info.SetAccessCreateAt(currentTime)
 	if exp := info.GetAccessExpiresIn(); exp == 0 {
-		zlog.Warn("the oauth access-token expiration time is not set")
+		zlog.LogWarn("the oauth access-token expiration time is not set")
 	}
 
 	// serialize the info
@@ -112,7 +112,7 @@ func (s *K8sSecretStore) createByAccess(ctx context.Context, info oauth2.TokenIn
 	// save the info to secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			// TODO: secret name only allows lowercase letters, check if there're conflicts if simply lowercasing them?
+			// FUTURE FIX: secret only allows lowercase letters, whether there are conflicts if simply lowercasing them
 			Name:      refactorSecretName(constants.AccessPrefix + info.GetAccess()),
 			Namespace: s.ns,
 		},
@@ -124,7 +124,7 @@ func (s *K8sSecretStore) createByAccess(ctx context.Context, info oauth2.TokenIn
 	// create the secret
 	_, err = s.k8sClient.CoreV1().Secrets(s.ns).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
-		zlog.Errorf("cannot create access-token secret %s, err: %v", info.GetAccess(), err)
+		zlog.LogErrorf("cannot create access-token secret %s, err: %v", info.GetAccess(), err)
 		return fuyaoerrors.ErrFailToCreateSecret
 	}
 
@@ -140,7 +140,7 @@ func (s *K8sSecretStore) RemoveByCode(ctx context.Context, code string) error {
 	name := constants.CodePrefix + code
 	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
-		zlog.Errorf("cannot delete auth-code secret %s, err: %v", code, err)
+		zlog.LogErrorf("cannot delete auth-code secret %s, err: %v", code, err)
 		return fuyaoerrors.ErrFailToDeleteSecret
 	}
 
@@ -152,7 +152,7 @@ func (s *K8sSecretStore) RemoveByAccess(ctx context.Context, access string) erro
 	name := refactorSecretName(constants.AccessPrefix + access)
 	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
-		zlog.Errorf("cannot delete access-token secret %s, err: %v", access, err)
+		zlog.LogErrorf("cannot delete access-token secret %s, err: %v", access, err)
 		return fuyaoerrors.ErrFailToDeleteSecret
 	}
 
@@ -170,7 +170,7 @@ func (s *K8sSecretStore) GetByCode(ctx context.Context, code string) (oauth2.Tok
 	name := constants.CodePrefix + code
 	userdata, err := s.k8sClient.CoreV1().Secrets(s.ns).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		zlog.Errorf("cannot get auth-code secret %s, err: %v", code, err)
+		zlog.LogErrorf("cannot get auth-code secret %s, err: %v", code, err)
 		return nil, fuyaoerrors.ErrFailToGetSecret
 	}
 
@@ -184,7 +184,7 @@ func (s *K8sSecretStore) GetByAccess(ctx context.Context, access string) (oauth2
 	name := refactorSecretName(constants.AccessPrefix + access)
 	userdata, err := s.k8sClient.CoreV1().Secrets(s.ns).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		zlog.Errorf("cannot get access-token secret %s, err: %v", access, err)
+		zlog.LogErrorf("cannot get access-token secret %s, err: %v", access, err)
 		return nil, fuyaoerrors.ErrFailToGetSecret
 	}
 
@@ -201,7 +201,7 @@ func (s *K8sSecretStore) decodeUserInfo(data []byte) (oauth2.TokenInfo, error) {
 	var userinfo models.Token
 	err := json.Unmarshal(data, &userinfo)
 	if err != nil {
-		zlog.Errorf("cannot unmarshal secret data, err: %v", err)
+		zlog.LogErrorf("cannot unmarshal secret data, err: %v", err)
 		return nil, fuyaoerrors.ErrFailToUnmarshalData
 	}
 

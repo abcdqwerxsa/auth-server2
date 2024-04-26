@@ -15,24 +15,25 @@ package httpserver
 
 import (
 	"net/http"
-	"oauth-server/pkg/zlog"
 	"time"
+
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
-// responseLogger 是一个自定义的响应记录器，用于记录响应状态码和大小
+// responseLogger is a custom response logger for recording response status codes and sizes
 type responseLogger struct {
 	http.ResponseWriter
 	status int
 	size   int
 }
 
-// WriteHeader 重写 http.ResponseWriter 的 WriteHeader 方法
+// WriteHeader rewrites the WriteHeader method of http.ResponseWriter
 func (rl *responseLogger) WriteHeader(code int) {
 	rl.status = code
 	rl.ResponseWriter.WriteHeader(code)
 }
 
-// Write 重写 http.ResponseWriter 的 Write 方法
+// Write rewrites the Write method of http.ResponseWriter
 func (rl *responseLogger) Write(b []byte) (int, error) {
 	size, err := rl.ResponseWriter.Write(b)
 	rl.size += size
@@ -44,44 +45,32 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		// 创建一个新的 responseLogger
+		// Create a new responseLogger
 		rl := &responseLogger{
 			ResponseWriter: w,
-			status:         http.StatusOK, // 默认状态码为 200
+			status:         http.StatusOK, // Default status code is 200
 		}
 
-		// 执行下一个处理器
+		// Execute the next handler
 		next.ServeHTTP(rl, r)
 
-		// 记录访问日志
+		// Log access
+		logFunc := zlog.LogInfof
 		if rl.status >= http.StatusBadRequest {
-			zlog.Warnf(
-				`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
-				r.RemoteAddr,
-				start.Format("02/Jan/2006:15:04:05 -0700"),
-				time.Since(start)/time.Millisecond,
-				r.Method,
-				r.RequestURI,
-				r.Proto,
-				rl.status,
-				rl.size,
-				r.Header.Get("Referer"),
-				r.UserAgent(),
-			)
-		} else {
-			zlog.Infof(
-				`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
-				r.RemoteAddr,
-				start.Format("02/Jan/2006:15:04:05 -0700"),
-				time.Since(start)/time.Millisecond,
-				r.Method,
-				r.RequestURI,
-				r.Proto,
-				rl.status,
-				rl.size,
-				r.Header.Get("Referer"),
-				r.UserAgent(),
-			)
+			logFunc = zlog.LogWarnf
 		}
+		logFunc(
+			`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
+			r.RemoteAddr,
+			start.Format("02/Jan/2006:15:04:05 -0700"),
+			time.Since(start).Milliseconds(),
+			r.Method,
+			r.RequestURI,
+			r.Proto,
+			rl.status,
+			rl.size,
+			r.Header.Get("Referer"),
+			r.UserAgent(),
+		)
 	})
 }

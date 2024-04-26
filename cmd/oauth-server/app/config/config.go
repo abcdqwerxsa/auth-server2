@@ -10,31 +10,33 @@
  * See the Mulan PSL v2 for more details.
  */
 
-// Package configs defines the overall configurations for OAuthServerAPIServer
-package configs
+// Package config defines the overall configurations for OAuthServerAPIServer
+package config
 
 import (
-	"oauth-server/pkg/configs"
-	"oauth-server/pkg/fuyaoerrors"
-	"oauth-server/pkg/httpserver"
 	"time"
+
+	"openfuyao/oauth-server/pkg/config"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/httpserver"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // OAuthServerAPIServerConfig stores the necessary configuration options for OAuth server
 type OAuthServerAPIServerConfig struct {
-	// configs for http httpserver
+	// config for http httpserver
 	HttpServerConfig *httpserver.ServerOptions `json:"HttpServerConfig"`
 
-	// idpLoginStore configs
+	// idpLoginStore config
 	IDPLoginStoreConfig *IDPLoginStoreConfig `json:"IDPLoginStoreConfig"`
 
-	// ipprotector configs
+	// ipprotector config
 	IPProtectorConfig *IPProtectorConfig `json:"IPProtectorConfig"`
 
-	// k8s configs
-	K8sConfig *configs.KubernetesConfig `json:"K8SConfig"`
+	// k8s config
+	K8sConfig *config.KubernetesConfig `json:"K8SConfig"`
 
-	// login configs
+	// login config
 	LoginConfig *LoginConfig `json:"LoginConfig"`
 
 	// OAuthAPIServerConfig for the inner oauth server options
@@ -45,7 +47,7 @@ type OAuthServerAPIServerConfig struct {
 func NewDefaultOAuthAPIServerServerConfig() *OAuthServerAPIServerConfig {
 	return &OAuthServerAPIServerConfig{
 		HttpServerConfig:    httpserver.NewDefaultHttpServerOptions(),
-		K8sConfig:           configs.NewKubernetesConfig(),
+		K8sConfig:           config.NewKubernetesConfig(),
 		LoginConfig:         newDefaultLoginConfig(),
 		IPProtectorConfig:   newDefaultIPProtectorConfig(),
 		IDPLoginStoreConfig: newIDPLoginStoreConfig(),
@@ -56,10 +58,32 @@ func NewDefaultOAuthAPIServerServerConfig() *OAuthServerAPIServerConfig {
 // Validate validates the config
 func (c *OAuthServerAPIServerConfig) Validate() []error {
 	var errs []error
-	if c.HttpServerConfig == nil {
-		errs = append(errs, fuyaoerrors.ErrHttpServerConfigMissing)
+
+	// validate each part of the config
+	if tmpErrs := c.HttpServerConfig.Validate(); len(tmpErrs) > 0 {
+		errs = append(errs, tmpErrs...)
 	}
-	// TODO: Validate 这里不应该这么简单地校验，可能需要每个config进行单独的校验
+
+	if tmpErrs := c.K8sConfig.Validate(); len(tmpErrs) > 0 {
+		errs = append(errs, tmpErrs...)
+	}
+
+	if tmpErrs := c.LoginConfig.Validate(); len(tmpErrs) > 0 {
+		errs = append(errs, tmpErrs...)
+	}
+
+	if tmpErrs := c.IPProtectorConfig.Validate(); len(tmpErrs) > 0 {
+		errs = append(errs, tmpErrs...)
+	}
+
+	if tmpErrs := c.IDPLoginStoreConfig.Validate(); len(tmpErrs) > 0 {
+		errs = append(errs, tmpErrs...)
+	}
+
+	if tmpErrs := c.OAuthServerConfig.Validate(); len(tmpErrs) > 0 {
+		errs = append(errs, tmpErrs...)
+	}
+
 	return errs
 }
 
@@ -89,9 +113,7 @@ func (c *OAuthServerAPIServerConfig) Complete() *OAuthServerAPIServerConfig {
 	return c
 }
 
-// TODO: 每个config是否要有自己的 Complete 和 Validate 呢
-
-// LoginConfig defines all configs used by fuyao login provider
+// LoginConfig defines all config used by fuyao login provider
 type LoginConfig struct {
 	Provider      string `json:"Provider"`
 	UserNamespace string `json:"UserNamespace"`
@@ -104,7 +126,23 @@ func newDefaultLoginConfig() *LoginConfig {
 	}
 }
 
-// IPProtectorConfig defines all configs used by ipprotector
+// Validate ensures legality of LoginConfig
+func (l *LoginConfig) Validate() []error {
+	var errs []error
+
+	if l.Provider == "" {
+		errs = append(errs, fuyaoerrors.ErrLoginConfigMissing)
+	}
+
+	if l.UserNamespace == "" {
+		zlog.LogWarn("attempting to load userinfo from default namespace")
+		l.UserNamespace = "default"
+	}
+
+	return errs
+}
+
+// IPProtectorConfig defines all config used by ipprotector
 type IPProtectorConfig struct {
 	FailTimes    int           `json:"FailTimes"`
 	FailDuration time.Duration `json:"FailDuration"`
@@ -123,6 +161,20 @@ func newDefaultIPProtectorConfig() *IPProtectorConfig {
 	}
 }
 
+// Validate either all fields are not set (0) or all fields are set (not 0) is legal
+func (i *IPProtectorConfig) Validate() []error {
+	var errs []error
+	if i.FailTimes == 0 && i.FailDuration == 0 || i.LockDuration == 0 {
+		return nil
+	}
+
+	if i.FailTimes == 0 || i.FailDuration == 0 || i.LockDuration == 0 {
+		errs = append(errs, fuyaoerrors.ErrIPProtectorConfigMissing)
+	}
+
+	return errs
+}
+
 // IDPLoginStoreConfig configures the store that temporally saves the user info
 type IDPLoginStoreConfig struct {
 	SessionName   string `json:"SessionName"`
@@ -138,6 +190,29 @@ func newIDPLoginStoreConfig() *IDPLoginStoreConfig {
 		SigningKey:    "auth",
 		EncryptionKey: "encrypt123123123",
 	}
+}
+
+// Validate ensures that IDPLoginStore is legal
+func (s *IDPLoginStoreConfig) Validate() []error {
+	var errs []error
+	if s.SessionName == "" {
+		zlog.LogError("session name is missing to set the cookie")
+		errs = append(errs, fuyaoerrors.ErrIdpLoginStoreConfigMissing)
+	}
+
+	if s.SessionMaxAge <= 0 {
+		zlog.LogWarn("the session-cookie will not expire")
+	}
+
+	if s.SigningKey == "" {
+		zlog.LogWarn("no signing key is provided to store the idp login state cookie")
+	}
+
+	if s.EncryptionKey == "" {
+		zlog.LogWarn("no encryption key is provided to store the idp login state cookie")
+	}
+
+	return errs
 }
 
 // OAuthServerConfig configures the inner oauth2 server
@@ -158,6 +233,7 @@ func newOAuthServerConfig() *OAuthServerConfig {
 		accessTokenExpHours  = 2
 		refreshTokenExpHours = 2
 	)
+
 	return &OAuthServerConfig{
 		CodeTokenNamespace: "oauth-code-token",
 		AuthCodeExp:        time.Minute * authCodeExpMins,
@@ -170,4 +246,43 @@ func newOAuthServerConfig() *OAuthServerConfig {
 			"console": "console-password",
 		},
 	}
+}
+
+// Validate ensures OAuthServerConfig is legal
+func (o *OAuthServerConfig) Validate() []error {
+	var errs []error
+	if o.CodeTokenNamespace == "" {
+		zlog.LogWarn("namespace to store code/token is not provided, using default instead")
+		o.CodeTokenNamespace = "default"
+	}
+
+	if o.AuthCodeExp <= 0 {
+		zlog.LogWarn("the authorization code will not expire")
+	}
+
+	if o.AccessTokenExp <= 0 {
+		zlog.LogWarn("the access token will not expire")
+	}
+
+	if o.IsGenerateRefresh || o.RefreshTokenExp > 0 {
+		zlog.LogWarn("the refresh token is not supported in this version, disable by default")
+		o.IsGenerateRefresh = false
+		o.RefreshTokenExp = 0
+	}
+
+	if o.JWTKeyID == "" {
+		zlog.LogWarn("the key id for JWT header is not provided")
+	}
+
+	if o.JWTPrivateKey == "" {
+		zlog.LogError(fuyaoerrors.ErrStrJWTPrivateKeyMissing)
+		errs = append(errs, fuyaoerrors.ErrJWTPrivateKeyMissing)
+	}
+
+	if o.ClientMapper == nil || len(o.ClientMapper) == 0 {
+		zlog.LogError("no client info is provided to oauth-server so it cannot authenticate anything")
+		errs = append(errs, fuyaoerrors.ErrClientInfoMissing)
+	}
+
+	return errs
 }

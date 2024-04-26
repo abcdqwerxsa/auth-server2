@@ -25,14 +25,14 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
 
-	"oauth-server/assets/templates"
-	"oauth-server/pkg/authenticators"
-	"oauth-server/pkg/constants"
-	"oauth-server/pkg/fuyaoerrors"
-	"oauth-server/pkg/idp"
-	"oauth-server/pkg/protector"
-	"oauth-server/pkg/sessions"
-	"oauth-server/pkg/zlog"
+	"openfuyao/oauth-server/assets/templates"
+	"openfuyao/oauth-server/pkg/authenticators"
+	"openfuyao/oauth-server/pkg/constants"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/idp"
+	"openfuyao/oauth-server/pkg/protector"
+	"openfuyao/oauth-server/pkg/sessions"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // LoginForm contains the fields used by fuyao login
@@ -78,10 +78,10 @@ func NewLogin(
 // LoginHandler deals with both GET/POST requests
 func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		// 处理GET请求
+		// deal with GET
 		l.renderLoginForm(w, r)
 	} else if r.Method == http.MethodPost {
-		// 处理POST请求
+		// deal with POST
 		l.processLogin(w, r)
 	} else {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -91,8 +91,6 @@ func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 // PasswordConfirmHandler works when the user login for the first time
 func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: 要不这里也先get一次然后再post一次？还是直接让前台处理好get这部分 我先把post的逻辑写在这里
-	// 即使是请求发到了这里，在更改之前还是要检测一下数据库是否已经是首次登陆，不是就要报错
 	// read userinfo from session-store
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
@@ -120,11 +118,11 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 
 	// no need to keep the info in idpLoginStore, erase them in the cookie/database
 	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-		zlog.Warnf("cannot delete the loginstore used in authorization, err: %v", err)
+		zlog.LogWarnf("cannot delete the loginstore used in authorization, err: %v", err)
 	}
-	zlog.Infof("Password Confirmation succeed for user: %s", username)
+	zlog.LogInfof("Password Confirmation succeed for user: %s", username)
 
-	// 正常重定向
+	// redirect normally
 	http.Redirect(w, r, then, http.StatusFound)
 }
 
@@ -143,9 +141,8 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
 		return
 	}
-	zlog.Infof("Password Reset succeed for user: %s", username)
+	zlog.LogInfof("Password Reset succeed for user: %s", username)
 
-	// 正常重定向, TODO: 是否要将 url 单独写到一个文件中
 	http.Redirect(w, r, "/auth/login", http.StatusFound)
 }
 
@@ -174,16 +171,15 @@ func (l *Login) renderLoginForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
-	// 处理登录表单提交
+	// fetch form value
 	username := r.FormValue(constants.UsernameParam)
 	password := r.FormValue(constants.PasswordParam)
-	// csrfToken := r.FormValue("csrf_token")
+	csrfToken := r.FormValue(constants.CSRFParam)
 	then := r.FormValue(constants.ThenParam)
 
 	// TODO: then 要check是否是当前访问的relative url，不是要重定向到 "/" 这里是不是一定是绝对url
-	// TODO: 验证 CSRF Token
 
-	// 验证用户名 密码
+	// check form value
 	if len(username) == 0 || len(password) == 0 {
 		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
 		return
@@ -191,16 +187,17 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	if len(then) == 0 {
 		then = "/"
 	}
-	zlog.Infof("Login request: Username: %s, Then: %s\n", username, then)
+	zlog.LogInfof("Login request: Username: %s, Then: %s\n", username, then)
+	zlog.LogWarnf("currently does not check csrfToken: %s", csrfToken)
 
-	// 防爆破check，是否当前ip会被封禁
+	// login devastation check
 	ipAddress := getIPAddress(r)
 	if l.loginIPProtector.IsLocked(ipAddress) {
 		http.Error(w, fuyaoerrors.ErrStrLoginBlocked, http.StatusUnauthorized)
 		return
 	}
 
-	// 进行登陆check
+	// verify the password
 	response, ok, err := l.Authenticator.AuthenticatePassword(context.Background(), username, password)
 
 	// service internal error
@@ -226,7 +223,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	zlog.Infof("Successfully logging in with %s", response.User.GetName())
+	zlog.LogInfof("Successfully logging in with %s", response.User.GetName())
 
 	// 重定向回到 /oauth/authorize
 	http.Redirect(w, r, then, http.StatusFound)
@@ -241,7 +238,7 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 	// serialize extra (map[string][]string)
 	jsonExtra, err := json.Marshal(user.GetExtra())
 	if err != nil {
-		zlog.Errorf("cannot marshal data, err: %v", err)
+		zlog.LogErrorf("cannot marshal data, err: %v", err)
 		return fuyaoerrors.ErrFailToMarshalData
 	}
 	values[constants.UserExtra] = jsonExtra

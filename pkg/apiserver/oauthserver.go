@@ -15,16 +15,18 @@ package apiserver
 
 import (
 	"context"
-	"github.com/gorilla/mux"
 	"net/http"
-	overallconfigs "oauth-server/cmd/oauth-server/app/configs"
-	"oauth-server/pkg/configs"
-	"oauth-server/pkg/httpserver"
-	"oauth-server/pkg/idp/fuyaopassword"
-	"oauth-server/pkg/oauth2"
-	"oauth-server/pkg/protector"
-	"oauth-server/pkg/sessions"
-	"oauth-server/pkg/zlog"
+
+	"github.com/gorilla/mux"
+
+	overallconfigs "openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/config"
+	"openfuyao/oauth-server/pkg/httpserver"
+	"openfuyao/oauth-server/pkg/idp/fuyaopassword"
+	"openfuyao/oauth-server/pkg/oauth2"
+	"openfuyao/oauth-server/pkg/protector"
+	"openfuyao/oauth-server/pkg/sessions"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // OAuthServerAPIServer is the true apiserver that handles requests
@@ -49,7 +51,7 @@ func NewOAuthServerAPIServer(
 	server.Handler = router
 
 	// init each component
-	k8sClient := configs.GetKubernetesClient(cfg.K8sConfig)
+	k8sClient := config.GetKubernetesClient(cfg.K8sConfig)
 	idpLoginStore := sessions.NewSessionStore(
 		cfg.IDPLoginStoreConfig.SessionName, cfg.IDPLoginStoreConfig.SessionMaxAge,
 		[]byte(cfg.IDPLoginStoreConfig.SigningKey), []byte(cfg.IDPLoginStoreConfig.EncryptionKey))
@@ -72,8 +74,8 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.HandleFunc("/auth/login/fuyaoPasswordProvider", s.Login.LoginHandler)
 	s.Router.HandleFunc("/auth/password/confirm/fuyaoPasswordProvider", s.Login.PasswordConfirmHandler)
 	s.Router.HandleFunc("/auth/password/modify/fuyaoPasswordProvider", s.Login.PasswordResetHandler)
-	s.Router.HandleFunc("/oauth/authorize", s.OAuthServer.OAuth2AuthorizeHandler)
-	s.Router.HandleFunc("/oauth/token", s.OAuthServer.OAuth2TokenHandler)
+	s.Router.HandleFunc("/oauth/authorize", s.OAuthServer.OAuthAuthorizeHandler)
+	s.Router.HandleFunc("/oauth/token", s.OAuthServer.OAuthTokenHandler)
 	return nil
 }
 
@@ -85,10 +87,10 @@ func (s *OAuthServerAPIServer) Run(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		err := s.Server.Shutdown(shutdownCtx)
-		zlog.Errorf("server shuts down, err: %v", err)
+		zlog.LogErrorf("server shuts down, err: %v", err)
 	}()
 
-	zlog.Infof("Start listening on %s", s.Server.Addr)
+	zlog.LogInfof("Start listening on %s", s.Server.Addr)
 	var err error
 	if s.Server.TLSConfig != nil {
 		err = s.Server.ListenAndServeTLS("", "")

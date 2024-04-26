@@ -1,0 +1,4 @@
+1. 修改mux使得mux可以处理uri组，fuyaoPasswordProvider 在router内部中通过路径参数读取。
+2. 所有cookie/session/auth-code/access-token的expiration time要重新check一下
+3. 验证CSRFtoken的存在
+4. 所有的url写到一个go file中

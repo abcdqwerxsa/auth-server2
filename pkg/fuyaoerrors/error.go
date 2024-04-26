@@ -19,70 +19,246 @@ import (
 )
 
 const (
-	// ErrStrFailToDisplayLogin and belows are internal runtime errors string
-	ErrStrFailToDisplayLogin           = "unable to display login page"
-	ErrStrUsernameOrPasswordMissing    = "missing username or password in the post request"
-	ErrStrFailToParseForm              = "cannot parse the form"
-	ErrStrLoginServiceDown             = "the login server returns error, please check logs for details"
+	// ErrStrFailToDisplayLogin represents an internal runtime error indicating the inability to display the login page.
+	ErrStrFailToDisplayLogin = "unable to display login page"
+
+	// ErrStrUsernameOrPasswordMissing represents an internal runtime error indicating missing username or password
+	// in the post request.
+	ErrStrUsernameOrPasswordMissing = "missing username or password in the post request"
+
+	// ErrStrFailToParseForm represents an internal runtime error indicating the inability to parse the form.
+	ErrStrFailToParseForm = "cannot parse the form"
+
+	// ErrStrLoginServiceDown represents an internal runtime error indicating that the login server returns an error.
+	// It advises checking logs for details.
+	ErrStrLoginServiceDown = "the login server returns error, please check logs for details"
+
+	// ErrStrPasswordAuthenticationFailed represents an internal runtime error indicating incorrect
+	// username or password during authentication.
 	ErrStrPasswordAuthenticationFailed = "incorrect username or password"
-	ErrStrPasswordSame                 = "the new password is the same as the original password"
-	ErrStrPasswordTooWeak              = "the input new password cannot pass the complexity check"
-	ErrStrIdentityProviderIncorrect    = "the input identity_provider is not valid"
-	ErrStrTokenTypeUnrecognized        = "the input token type is not valid"
-	ErrStrFailToCreateSecret           = "fail to create k8s secret resource"
-	ErrStrFailToDeleteSecret           = "fail to delete k8s secret resource"
-	ErrStrFailToGetSecret              = "fail to get k8s secret resource"
-	ErrStrFailToPatchSecret            = "fail to patch k8s secret resource"
-	ErrStrNotImplemented               = "function is not implemented"
-	ErrStrFailToMarshalData            = "cannot unmarshal data"
-	ErrStrFailToUnmarshalData          = "cannot unmarshal data"
-	ErrStrNotFirstLogin                = "this user is not the first time logging in, please go to the login page"
-	ErrStrNotLogin                     = "user not logged in, unauthorized to do anything"
-	ErrStrLoginBlocked                 = "request is blocked due to multiple failed login attempts"
-	// ErrStrInvalidHttpAndHttpsPort and belows are httpserver errors string
+
+	// ErrStrPasswordSame represents an internal runtime error indicating that the new password is the same as the
+	// original password.
+	ErrStrPasswordSame = "the new password is the same as the original password"
+
+	// ErrStrPasswordTooWeak represents an internal runtime error indicating that the input new password cannot
+	// pass the complexity check.
+	ErrStrPasswordTooWeak = "the input new password cannot pass the complexity check"
+
+	// ErrStrIdentityProviderIncorrect represents an internal runtime error indicating that the input identity_provider
+	// is not valid.
+	ErrStrIdentityProviderIncorrect = "the input identity_provider is not valid"
+
+	// ErrStrTokenTypeUnrecognized represents an internal runtime error indicating the input token type is not valid.
+	ErrStrTokenTypeUnrecognized = "the input token type is not valid"
+
+	// ErrStrFailToCreateSecret represents an internal runtime error failing to create a Kubernetes secret resource.
+	ErrStrFailToCreateSecret = "fail to create k8s secret resource"
+
+	// ErrStrFailToDeleteSecret represents an internal runtime error failing to delete a Kubernetes secret resource.
+	ErrStrFailToDeleteSecret = "fail to delete k8s secret resource"
+
+	// ErrStrFailToGetSecret represents an internal runtime error failing to get a Kubernetes secret resource.
+	ErrStrFailToGetSecret = "fail to get k8s secret resource"
+
+	// ErrStrFailToPatchSecret represents an internal runtime error failing to patch a Kubernetes secret resource.
+	ErrStrFailToPatchSecret = "fail to patch k8s secret resource"
+
+	// ErrStrNotImplemented represents an internal runtime error indicating that a function is not implemented.
+	ErrStrNotImplemented = "function is not implemented"
+
+	// ErrStrFailToMarshalData represents an internal runtime error indicating the inability to marshal data.
+	ErrStrFailToMarshalData = "cannot marshal data"
+
+	// ErrStrFailToUnmarshalData represents an internal runtime error indicating the inability to unmarshal data.
+	ErrStrFailToUnmarshalData = "cannot unmarshal data"
+
+	// ErrStrNotFirstLogin represents an internal runtime error indicating that the user is not logging in
+	// for the first time and should go to the login page.
+	ErrStrNotFirstLogin = "this user is not the first time logging in, please go to the login page"
+
+	// ErrStrNotLogin represents an internal runtime error indicating that the user is not logged in and
+	// unauthorized to perform any action.
+	ErrStrNotLogin = "user not logged in, unauthorized to do anything"
+
+	// ErrStrLoginBlocked represents an internal runtime error indicating that the request is blocked due to
+	// multiple failed login attempts.
+	ErrStrLoginBlocked = "request is blocked due to multiple failed login attempts"
+
+	// ErrStrInvalidHttpAndHttpsPort represents an HTTP server error indicating that both HTTP and HTTPS ports
+	// cannot be invalid at the same time.
 	ErrStrInvalidHttpAndHttpsPort = "http and https port cannot be invalid at the same time"
-	ErrStrEmptyCertFile           = "the tls cert file is empty to serve https requests"
-	ErrStrEmptyPrivateKeyFile     = "the tls private key file is empty to serve https requests"
-	ErrStrEmptyMasterCAFile       = "the master CA file is empty to serve https requests"
-	ErrStrFailToLoadCert          = "the cert and private key does not match"
-	// ErrStrOAuthServerConfigFileMissing and belows are oauthServerOption errors string
-	ErrStrOAuthServerConfigFileMissing = "the configfile is missing to start the httpserver"
-	ErrStrJWTPrivateKeyMissing         = "the JWT private key is missing to start the httpserver"
-	ErrStrHttpServerConfigMissing      = "the config is incomplete to start the server"
+
+	// ErrStrWritingHttpHeader represents an HTTP server error failing to write back to http header
+	ErrStrWritingHttpHeader = "fail to write content back the http header"
+
+	// ErrStrEmptyCertFile represents an HTTP server error indicating that the TLS cert file is empty to
+	// serve HTTPS requests.
+	ErrStrEmptyCertFile = "the tls cert file is empty to serve https requests"
+
+	// ErrStrEmptyPrivateKeyFile represents an HTTP server error indicating that the TLS private key file is empty to
+	// serve HTTPS requests.
+	ErrStrEmptyPrivateKeyFile = "the tls private key file is empty to serve https requests"
+
+	// ErrStrEmptyMasterCAFile represents an HTTP server error indicating that the master CA file is empty to
+	// serve HTTPS requests.
+	ErrStrEmptyMasterCAFile = "the master CA file is empty to serve https requests"
+
+	// ErrStrFailToLoadCert represents an HTTP server error indicating that the cert and private key do not match.
+	ErrStrFailToLoadCert = "the cert and private key does not match"
+
+	// ErrStrOAuthServerConfigFileMissing represents an OAuth server option error indicating that
+	// the config file is missing to start the HTTP server.
+	ErrStrOAuthServerConfigFileMissing = "the config file is missing to start the httpserver"
+
+	// ErrStrJWTPrivateKeyMissing represents an OAuth server option error indicating that the JWT private key
+	// is missing to start the HTTP server.
+	ErrStrJWTPrivateKeyMissing = "the JWT private key is missing to start the httpserver"
+
+	// ErrStrHttpServerConfigMissing represents an OAuth server option error indicating that the HTTP server config is
+	// incomplete to start the server.
+	ErrStrHttpServerConfigMissing = "the httpserver config is incomplete to start the server"
+
+	// ErrStrIPProtectorConfigMissing represents an OAuth server option error indicating that the IP protector config
+	// is incomplete to start the server.
+	ErrStrIPProtectorConfigMissing = "the ip protector config is incomplete to start the server"
+
+	// ErrStrIdpLoginStoreConfigMissing represents an OAuth server option error indicating that the IDP login store
+	// config is incomplete to start the server.
+	ErrStrIdpLoginStoreConfigMissing = "the idploginstore config is incomplete to start the server"
+
+	// ErrStrLoginConfigMissing represents an OAuth server option error indicating that the login config is
+	// incomplete to start the server.
+	ErrStrLoginConfigMissing = "the login config is incomplete to start the server"
+
+	// ErrStrClientInfoMissing represents an OAuth server option error indicating that the client-info is
+	// incomplete to start the server.
+	ErrStrClientInfoMissing = "the client-info is incomplete to start the server"
 )
 
 var (
-	// ErrFailToDisplayLogin and belows are internal runtime errors
-	ErrFailToDisplayLogin           = errors.New(ErrStrFailToDisplayLogin)
-	ErrUsernameOrPasswordMissing    = errors.New(ErrStrUsernameOrPasswordMissing)
-	ErrFailToParseForm              = errors.New(ErrStrFailToParseForm)
-	ErrLoginServiceDown             = errors.New(ErrStrLoginServiceDown)
+	// ErrFailToDisplayLogin represents an internal runtime error indicating the inability to display the login page.
+	ErrFailToDisplayLogin = errors.New(ErrStrFailToDisplayLogin)
+
+	// ErrUsernameOrPasswordMissing represents an internal runtime error indicating missing username or password
+	// in the post request.
+	ErrUsernameOrPasswordMissing = errors.New(ErrStrUsernameOrPasswordMissing)
+
+	// ErrFailToParseForm represents an internal runtime error indicating the inability to parse the form.
+	ErrFailToParseForm = errors.New(ErrStrFailToParseForm)
+
+	// ErrLoginServiceDown represents an internal runtime error indicating that the login server returns an error.
+	// It advises checking logs for details.
+	ErrLoginServiceDown = errors.New(ErrStrLoginServiceDown)
+
+	// ErrPasswordAuthenticationFailed represents an internal runtime error indicating incorrect username or
+	// password during authentication.
 	ErrPasswordAuthenticationFailed = errors.New(ErrStrPasswordAuthenticationFailed)
-	ErrPasswordSame                 = errors.New(ErrStrPasswordSame)
-	ErrPasswordTooWeak              = errors.New(ErrStrPasswordTooWeak)
-	ErrIdentityProviderIncorrect    = errors.New(ErrStrIdentityProviderIncorrect)
-	ErrTokenTypeUnrecognized        = errors.New(ErrStrTokenTypeUnrecognized)
-	ErrFailToCreateSecret           = errors.New(ErrStrFailToCreateSecret)
-	ErrFailToDeleteSecret           = errors.New(ErrStrFailToDeleteSecret)
-	ErrFailToGetSecret              = errors.New(ErrStrFailToGetSecret)
-	ErrFailToPatchSecret            = errors.New(ErrStrFailToPatchSecret)
-	ErrNotImplemented               = errors.New(ErrStrNotImplemented)
-	ErrFailToMarshalData            = errors.New(ErrStrFailToMarshalData)
-	ErrFailToUnmarshalData          = errors.New(ErrStrFailToUnmarshalData)
-	ErrNotFirstLogin                = errors.New(ErrStrNotFirstLogin)
-	ErrNotLogin                     = errors.New(ErrStrNotLogin)
-	ErrLoginBlocked                 = errors.New(ErrStrLoginBlocked)
-	// ErrInvalidHttpAndHttpsPort and belows are httpserver errors
+
+	// ErrPasswordSame represents an internal runtime error indicating that the new password is the same as
+	// the original password.
+	ErrPasswordSame = errors.New(ErrStrPasswordSame)
+
+	// ErrPasswordTooWeak represents an internal runtime error indicating that the input new password cannot
+	// pass the complexity check.
+	ErrPasswordTooWeak = errors.New(ErrStrPasswordTooWeak)
+
+	// ErrIdentityProviderIncorrect represents an internal runtime error indicating that the input
+	// identity_provider is not valid.
+	ErrIdentityProviderIncorrect = errors.New(ErrStrIdentityProviderIncorrect)
+
+	// ErrTokenTypeUnrecognized represents an internal runtime error indicating that the input token type is not valid.
+	ErrTokenTypeUnrecognized = errors.New(ErrStrTokenTypeUnrecognized)
+
+	// ErrFailToCreateSecret represents an internal runtime error indicating failure to create a
+	// Kubernetes secret resource.
+	ErrFailToCreateSecret = errors.New(ErrStrFailToCreateSecret)
+
+	// ErrFailToDeleteSecret represents an internal runtime error indicating failure to delete a
+	// Kubernetes secret resource.
+	ErrFailToDeleteSecret = errors.New(ErrStrFailToDeleteSecret)
+
+	// ErrFailToGetSecret represents an internal runtime error indicating failure to get a
+	// Kubernetes secret resource.
+	ErrFailToGetSecret = errors.New(ErrStrFailToGetSecret)
+
+	// ErrFailToPatchSecret represents an internal runtime error indicating failure to patch a
+	// Kubernetes secret resource.
+	ErrFailToPatchSecret = errors.New(ErrStrFailToPatchSecret)
+
+	// ErrNotImplemented represents an internal runtime error indicating that a function is not implemented.
+	ErrNotImplemented = errors.New(ErrStrNotImplemented)
+
+	// ErrFailToMarshalData represents an internal runtime error indicating the inability to marshal data.
+	ErrFailToMarshalData = errors.New(ErrStrFailToMarshalData)
+
+	// ErrFailToUnmarshalData represents an internal runtime error indicating the inability to unmarshal data.
+	ErrFailToUnmarshalData = errors.New(ErrStrFailToUnmarshalData)
+
+	// ErrNotFirstLogin represents an internal runtime error indicating that the user is not logging in for the
+	// first time and should go to the login page.
+	ErrNotFirstLogin = errors.New(ErrStrNotFirstLogin)
+
+	// ErrNotLogin represents an internal runtime error indicating that the user is not logged in and unauthorized
+	// to perform any action.
+	ErrNotLogin = errors.New(ErrStrNotLogin)
+
+	// ErrLoginBlocked represents an internal runtime error indicating that the request is blocked due to multiple
+	// failed login attempts.
+	ErrLoginBlocked = errors.New(ErrStrLoginBlocked)
+
+	// ErrInvalidHttpAndHttpsPort represents an HTTP server error indicating that both HTTP and HTTPS ports cannot
+	// be invalid at the same time.
 	ErrInvalidHttpAndHttpsPort = errors.New(ErrStrInvalidHttpAndHttpsPort)
-	ErrEmptyCertFile           = errors.New(ErrStrEmptyCertFile)
-	ErrEmptyPrivateKeyFile     = errors.New(ErrStrEmptyPrivateKeyFile)
-	ErrEmptyMasterCAFile       = errors.New(ErrStrEmptyMasterCAFile)
-	ErrFailToLoadCert          = errors.New(ErrStrFailToLoadCert)
-	ErrIntExitSignal           = 255
-	// ErrOAuthServerConfigFileMissing and belows are oauthServerOption errors
+
+	// ErrWritingHttpHeader represents an HTTP server error failing to write back to http header
+	ErrWritingHttpHeader = errors.New(ErrStrWritingHttpHeader)
+
+	// ErrEmptyCertFile represents an HTTP server error indicating that the TLS cert file is empty to
+	// serve HTTPS requests.
+	ErrEmptyCertFile = errors.New(ErrStrEmptyCertFile)
+
+	// ErrEmptyPrivateKeyFile represents an HTTP server error indicating that the TLS private key file is empty to
+	// serve HTTPS requests.
+	ErrEmptyPrivateKeyFile = errors.New(ErrStrEmptyPrivateKeyFile)
+
+	// ErrEmptyMasterCAFile represents an HTTP server error indicating that the master CA file is empty to
+	// serve HTTPS requests.
+	ErrEmptyMasterCAFile = errors.New(ErrStrEmptyMasterCAFile)
+
+	// ErrFailToLoadCert represents an HTTP server error indicating that the cert and private key do not match.
+	ErrFailToLoadCert = errors.New(ErrStrFailToLoadCert)
+
+	// ErrIntExitSignal represents an internal exit signal error with the code 255.
+	ErrIntExitSignal = 255
+
+	// ErrOAuthServerConfigFileMissing represents an OAuth server option error indicating that the config file is
+	// missing to start the HTTP server.
 	ErrOAuthServerConfigFileMissing = errors.New(ErrStrOAuthServerConfigFileMissing)
-	ErrJWTPrivateKeyMissing         = errors.New(ErrStrJWTPrivateKeyMissing)
-	ErrHttpServerConfigMissing      = errors.New(ErrStrHttpServerConfigMissing)
+
+	// ErrJWTPrivateKeyMissing represents an OAuth server option error indicating that the JWT private key is
+	// missing to start the HTTP server.
+	ErrJWTPrivateKeyMissing = errors.New(ErrStrJWTPrivateKeyMissing)
+
+	// ErrHttpServerConfigMissing represents an OAuth server option error indicating that the HTTP server config is
+	// incomplete to start the server.
+	ErrHttpServerConfigMissing = errors.New(ErrStrHttpServerConfigMissing)
+
+	// ErrIPProtectorConfigMissing represents an OAuth server option error indicating that the IP protector config is
+	// incomplete to start the server.
+	ErrIPProtectorConfigMissing = errors.New(ErrStrIPProtectorConfigMissing)
+
+	// ErrIdpLoginStoreConfigMissing represents an OAuth server option error indicating that the IDP login store
+	// config is incomplete to start the server.
+	ErrIdpLoginStoreConfigMissing = errors.New(ErrStrIdpLoginStoreConfigMissing)
+
+	// ErrLoginConfigMissing represents an OAuth server option error indicating that the login config is incomplete
+	// to start the server.
+	ErrLoginConfigMissing = errors.New(ErrStrLoginConfigMissing)
+
+	// ErrClientInfoMissing represents an OAuth server option error indicating that the client-info is incomplete
+	// to start the server.
+	ErrClientInfoMissing = errors.New(ErrStrClientInfoMissing)
 )
 
 // ErrStatusCode is the mapper from error to http return error

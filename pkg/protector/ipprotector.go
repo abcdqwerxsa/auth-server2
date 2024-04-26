@@ -17,7 +17,7 @@ import (
 	"container/list"
 	"time"
 
-	"oauth-server/cmd/oauth-server/app/configs"
+	"openfuyao/oauth-server/cmd/oauth-server/app/config"
 )
 
 type failedLoginTracker struct {
@@ -35,7 +35,7 @@ type LoginIPProtector struct {
 }
 
 // NewLoginIPProtector inits LoginIPProtector
-func NewLoginIPProtector(config *configs.IPProtectorConfig) *LoginIPProtector {
+func NewLoginIPProtector(config *config.IPProtectorConfig) *LoginIPProtector {
 	return &LoginIPProtector{
 		ipProtector:  make(map[string]*failedLoginTracker),
 		lockDuration: config.LockDuration,
@@ -54,7 +54,7 @@ func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) {
 	p.squeezeTracker(ip)
 
 	// determine whether blocking the ip
-	if p.ipProtector[ip].queue.Len() >= p.failTimes {
+	if p.ipProtector[ip].queue.Len() >= p.failTimes && p.ipProtector[ip].queue.Len() > 0 {
 		p.ipProtector[ip].lockTime = time.Now()
 		p.ipProtector[ip].locked = true
 	}
