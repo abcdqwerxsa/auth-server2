@@ -17,21 +17,26 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"text/template"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
 
 	"openfuyao/oauth-server/assets/templates"
+	"openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/authenticators"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/idp"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
+	"openfuyao/oauth-server/pkg/store"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -55,6 +60,8 @@ func (l *LoginForm) OutputHTML(w http.ResponseWriter, tpl string, name string) {
 type Login struct {
 	Provider string
 	// CSRF csrf.CSRF
+	K8sClient        kubernetes.Interface
+	TokenStore       *store.K8sSecretStore
 	Authenticator    authenticators.PasswordAuthenticator
 	idpLoginStore    *sessions.CookieStore
 	loginIPProtector *protector.LoginIPProtector
@@ -64,12 +71,15 @@ type Login struct {
 func NewLogin(
 	idpLoginStore *sessions.CookieStore,
 	k8sClient kubernetes.Interface,
+	tokenStore *store.K8sSecretStore,
 	loginIPProtector *protector.LoginIPProtector,
-	provider, ns string,
+	loginConfig *config.LoginConfig,
 ) *Login {
 	return &Login{
-		Provider:         provider,
-		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, ns),
+		Provider:         loginConfig.Provider,
+		K8sClient:        k8sClient,
+		TokenStore:       tokenStore,
+		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, loginConfig.UserNamespace),
 		idpLoginStore:    idpLoginStore,
 		loginIPProtector: loginIPProtector,
 	}
@@ -87,6 +97,26 @@ func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+}
+
+// LogoutHandler in openFuyao fuyaoPasswordProvider delete the accessToken secret
+func (l *Login) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	// check logged in status
+	accessToken, err := l.getAccessToken(r)
+	if err != nil {
+		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusBadRequest)
+		return
+	}
+	loggedIn, err := l.authenticateByWebhook(accessToken)
+	if !loggedIn || err != nil {
+		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+	}
+
+	// delete the accessToken secret
+	if err = l.TokenStore.RemoveByAccess(context.TODO(), accessToken); err != nil {
+		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+	}
+	return
 }
 
 // PasswordConfirmHandler works when the user login for the first time
@@ -128,6 +158,18 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 
 // PasswordResetHandler resets the password
 func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
+	// add an access token validation, since all the services are required to expose in this version
+	accessToken, err := l.getAccessToken(r)
+	if err != nil {
+		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusBadRequest)
+		return
+	}
+
+	loggedIn, err := l.authenticateByWebhook(accessToken)
+	if !loggedIn || err != nil {
+		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+	}
+
 	// read params from r.url
 	username := r.FormValue(constants.UsernameParam)
 	oldPassword := r.FormValue(constants.OriginalPasswordParam)
@@ -144,6 +186,71 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	zlog.LogInfof("Password Reset succeed for user: %s", username)
 
 	http.Redirect(w, r, "/auth/login", http.StatusFound)
+}
+
+func (l *Login) getAccessToken(r *http.Request) (string, error) {
+	// blindly get access-token from header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		// Check if the Authorization header starts with "Bearer "
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			// Extract the access token
+			accessToken := strings.TrimPrefix(authHeader, "Bearer ")
+			return accessToken, nil
+		}
+	}
+
+	// Try loading from Body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		// Handle error
+		zlog.LogErrorf("cannot read from request body, err: %v", err)
+		return "", fuyaoerrors.ErrFailToUnmarshalData
+	}
+	defer func() {
+		err = r.Body.Close()
+		if err != nil {
+			zlog.LogError("Error closing request body:", err)
+		}
+	}()
+
+	// Define a struct to hold the JSON data
+	type RequestBody struct {
+		AccessToken string `json:"access-token"`
+	}
+
+	// Unmarshal the JSON data into the struct
+	var requestBody RequestBody
+	err = json.Unmarshal(body, &requestBody)
+	if err != nil {
+		// Handle error
+		zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToUnmarshalData, err)
+		return "", fuyaoerrors.ErrNotLogin
+	}
+
+	// Extract the access token from the request body
+	accessToken := requestBody.AccessToken
+	if accessToken == "" {
+		// Handle case when access-token is not found in request body
+		return "", fuyaoerrors.ErrNotLogin
+	}
+
+	return accessToken, nil
+}
+
+func (l *Login) authenticateByWebhook(accessToken string) (bool, error) {
+	tokenReview := &authenticationv1.TokenReview{
+		Spec: authenticationv1.TokenReviewSpec{Token: accessToken},
+	}
+
+	tokenReviewResponse, err := l.K8sClient.AuthenticationV1().TokenReviews().Create(
+		context.TODO(), tokenReview, metav1.CreateOptions{})
+	if err != nil {
+		zlog.LogErrorf("cannot post tokenReview to k8s, err: %v", err)
+		return false, fuyaoerrors.ErrNotLogin
+	}
+
+	return tokenReviewResponse.Status.Authenticated, nil
 }
 
 func (l *Login) renderLoginForm(w http.ResponseWriter, r *http.Request) {
@@ -176,8 +283,6 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue(constants.PasswordParam)
 	csrfToken := r.FormValue(constants.CSRFParam)
 	then := r.FormValue(constants.ThenParam)
-
-	// TODO: then 要check是否是当前访问的relative url，不是要重定向到 "/" 这里是不是一定是绝对url
 
 	// check form value
 	if len(username) == 0 || len(password) == 0 {
@@ -217,7 +322,6 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// successfully login, erase ip block flag
 	l.loginIPProtector.Unlock(ipAddress)
 
-	// TODO: 将session中写入用户信息，这里的sessionSave有bug
 	if err = l.saveLoginStateToSession(response.User, w); err != nil {
 		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
 		return

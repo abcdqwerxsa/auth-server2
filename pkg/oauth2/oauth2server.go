@@ -14,12 +14,14 @@
 package oauth2
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-oauth2/oauth2/v4"
 	oauth2errors "github.com/go-oauth2/oauth2/v4/errors"
@@ -31,7 +33,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/client-go/kubernetes"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/constants"
@@ -50,10 +51,12 @@ type FuyaoAuthorizeRequest struct {
 
 // FuyaoAuthorizeServer extends the original authorize server in go-oauth2
 type FuyaoAuthorizeServer struct {
-	// 继承并重写部分接口
+	// inherits and overrides some interfaces
 	*server.Server
-	// session-store 实现，这个是存储用户是否已经通过账户密码登录的接口
+	// session-store implementation, which stores whether the user has logged in via account password
 	idpLoginStore *sessions.CookieStore
+	// tokenStore stores the code/access-token in the k8s secret
+	tokenStore oauth2.TokenStore
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer
@@ -61,11 +64,58 @@ func NewFuyaoAuthorizeServer(
 	cfg *server.Config,
 	manager oauth2.Manager,
 	idpLoginStore *sessions.CookieStore,
+	tokenStore oauth2.TokenStore,
 ) *FuyaoAuthorizeServer {
 	return &FuyaoAuthorizeServer{
 		Server:        server.NewServer(cfg, manager),
 		idpLoginStore: idpLoginStore,
+		tokenStore:    tokenStore,
 	}
+}
+
+// NewOAuthServer inits the go-oauth2 oauth server
+func NewOAuthServer(
+	idpLoginStore *sessions.CookieStore,
+	tokenStore *fuyaostore.K8sSecretStore,
+	cfg *config.OAuthServerConfig,
+) *FuyaoAuthorizeServer {
+	manager := manage.NewDefaultManager()
+	manager.SetAuthorizeCodeTokenCfg(
+		&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp,
+			IsGenerateRefresh: cfg.IsGenerateRefresh})
+	manager.SetAuthorizeCodeExp(cfg.AuthCodeExp)
+	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
+
+	// token store
+	manager.MustTokenStorage(store.NewMemoryTokenStore())
+	// generate jwt access token
+	manager.MapAccessGenerate(
+		generates.NewJWTAccessGenerate(cfg.JWTKeyID, []byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
+
+	clientStore := store.NewClientStore()
+	for client, secret := range cfg.ClientMapper {
+		clientStore.Set(client, &models.Client{
+			ID:     client,
+			Secret: secret,
+		})
+	}
+	manager.MapClientStorage(clientStore)
+	manager.MapTokenStorage(tokenStore)
+
+	srv := NewFuyaoAuthorizeServer(server.NewConfig(), manager, idpLoginStore, tokenStore)
+	srv.SetInternalErrorHandler(func(err error) (re *oauth2errors.Response) {
+		log.Println("Internal Error:", err.Error())
+		return
+	})
+	srv.SetResponseErrorHandler(func(re *oauth2errors.Response) {
+		log.Println("Response Error:", re.Error.Error())
+	})
+
+	// token request function configurations
+	srv.SetClientInfoHandler(server.ClientFormHandler)
+	srv.SetAllowGetAccessRequest(false)
+
+	return srv
 }
 
 // OAuthAuthorizeHandler http handler for /oauth/authorize
@@ -80,7 +130,7 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 	}
 
 	// check whether containing sessionID, if so fetching the user
-	// implement throught secured-cookie
+	// implement through secured-cookie
 	userResponse, ok, err := s.AuthorizeThroughSession(w, r)
 	if err != nil {
 		s.wrapReturnErrorHandler(w, s.redirectAuthorizationCodeError(w, req, err))
@@ -95,7 +145,6 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 		}
 		return
 	}
-	// TODO: specify scope of authorization and the expiration time of access token
 
 	// generate the oauth code
 	req.UserID = userResponse.User.GetName()
@@ -119,12 +168,28 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 	return
 }
 
-func (s *FuyaoAuthorizeServer) wrapReturnErrorHandler(w http.ResponseWriter, err error) {
+// OAuthTokenHandler http handler for /oauth/token
+func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	gt, tgr, err := s.ValidationTokenRequest(r)
 	if err != nil {
-		zlog.LogErrorf("fail when writing error back to the http response header, err: %v", err)
-		http.Error(w, fuyaoerrors.ErrStrWritingHttpHeader, http.StatusInternalServerError)
+		s.wrapReturnErrorHandler(w, s.generateTokenError(w, err))
 		return
 	}
+
+	ti, err := s.GetAccessToken(ctx, gt, tgr)
+	if err != nil {
+		// delete expired authorization code
+		if delErr := s.deleteExpiredAuthCode(tgr); delErr != nil {
+			zlog.LogErrorf("delete expired auth code goes wrong: err: %v", delErr)
+		}
+		s.wrapReturnErrorHandler(w, s.generateTokenError(w, err))
+		return
+	}
+
+	s.wrapReturnErrorHandler(w, s.returnAccessToken(w, s.GetTokenData(ti), nil))
+
 	return
 }
 
@@ -134,7 +199,6 @@ func (s *FuyaoAuthorizeServer) RedirectToLogin(
 	w http.ResponseWriter,
 	r *http.Request,
 ) error {
-	// TODO: maybe we have multiple internal idps in the future
 	if req.identityProvider != constants.FuyaoIdpProvider {
 		return fuyaoerrors.ErrIdentityProviderIncorrect
 	}
@@ -208,6 +272,11 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
 	}
 
 	if !ok1 || !ok2 || !ok3 || !ok4 {
+		// the session is broken, flush it
+		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+			return nil, false, err
+		}
 		return nil, false, nil
 	}
 
@@ -237,12 +306,40 @@ func (s *FuyaoAuthorizeServer) GetErrorData(err error) (map[string]interface{}, 
 	return s.Server.GetErrorData(err)
 }
 
+// deleteExpiredAuthCode flush the auth code secret if expiry
+func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRequest) error {
+	code := tgr.Code
+	ti, err := s.tokenStore.GetByCode(context.Background(), code)
+
+	if err != nil {
+		zlog.LogErrorf("cannot get auth code, err: %v", err)
+		return err
+	} else if ti != nil && ti.GetCodeCreateAt().Add(ti.GetCodeExpiresIn()).Before(time.Now()) {
+		// delete the auth code
+		if err = s.tokenStore.RemoveByCode(context.Background(), code); err != nil {
+			return err
+		}
+		zlog.LogInfof("successfully delete auth code in secret")
+	}
+
+	return nil
+}
+
 func (s *FuyaoAuthorizeServer) handleError(w http.ResponseWriter, req *FuyaoAuthorizeRequest, err error) error {
 	if fn := s.PreRedirectErrorHandler; fn != nil {
 		return fn(w, &req.AuthorizeRequest, err)
 	}
 
 	return s.redirectAuthorizationCodeError(w, req, err)
+}
+
+func (s *FuyaoAuthorizeServer) wrapReturnErrorHandler(w http.ResponseWriter, err error) {
+	if err != nil {
+		zlog.LogErrorf("fail when writing error back to the http response header, err: %v", err)
+		http.Error(w, fuyaoerrors.ErrStrWritingHttpHeader, http.StatusInternalServerError)
+		return
+	}
+	return
 }
 
 func (s *FuyaoAuthorizeServer) redirectAuthorizationCode(
@@ -271,85 +368,6 @@ func (s *FuyaoAuthorizeServer) redirectAuthorizationCodeError(
 
 	data, _, _ := s.GetErrorData(err)
 	return s.redirectAuthorizationCode(w, req, data)
-}
-
-// NewOAuthServer inits the go-oauth2 oauth server
-func NewOAuthServer(
-	idpLoginStore *sessions.CookieStore,
-	k8sClient kubernetes.Interface,
-	cfg *config.OAuthServerConfig,
-) *FuyaoAuthorizeServer {
-	manager := manage.NewDefaultManager()
-	// 这里可能需要后续把这些config单独拿出来
-	// 设置access_token 和 authorization_code 的超时时间
-	manager.SetAuthorizeCodeTokenCfg(
-		&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp,
-			IsGenerateRefresh: cfg.IsGenerateRefresh})
-	manager.SetAuthorizeCodeExp(cfg.AuthCodeExp)
-	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
-
-	// token store
-	manager.MustTokenStorage(store.NewMemoryTokenStore())
-	// generate jwt access token
-	manager.MapAccessGenerate(
-		generates.NewJWTAccessGenerate(cfg.JWTKeyID, []byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
-
-	clientStore := store.NewClientStore()
-	for client, secret := range cfg.ClientMapper {
-		clientStore.Set(client, &models.Client{
-			ID:     client,
-			Secret: secret,
-		})
-	}
-	manager.MapClientStorage(clientStore)
-	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, cfg.CodeTokenNamespace)
-	manager.MapTokenStorage(tokenStore)
-
-	srv := NewFuyaoAuthorizeServer(server.NewConfig(), manager, idpLoginStore)
-	srv.SetInternalErrorHandler(func(err error) (re *oauth2errors.Response) {
-		log.Println("Internal Error:", err.Error())
-		return
-	})
-	srv.SetResponseErrorHandler(func(re *oauth2errors.Response) {
-		log.Println("Response Error:", re.Error.Error())
-	})
-
-	// token request function configurations
-	srv.SetClientInfoHandler(server.ClientFormHandler)
-	srv.SetAllowGetAccessRequest(false)
-
-	return srv
-}
-
-// OAuthTokenHandler http handler for /oauth/token
-func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	gt, tgr, err := s.ValidationTokenRequest(r)
-	if err != nil {
-		if err = s.generateTokenError(w, err); err != nil {
-			zlog.LogErrorf("fail when writing error back to the http response header, err: %v", err)
-			http.Error(w, fuyaoerrors.ErrStrWritingHttpHeader, http.StatusInternalServerError)
-			return
-		}
-	}
-
-	ti, err := s.GetAccessToken(ctx, gt, tgr)
-	if err != nil {
-		if err = s.generateTokenError(w, err); err != nil {
-			zlog.LogErrorf("fail when writing error back to the http response header, err: %v", err)
-			http.Error(w, fuyaoerrors.ErrStrWritingHttpHeader, http.StatusInternalServerError)
-			return
-		}
-	}
-
-	if err = s.returnAccessToken(w, s.GetTokenData(ti), nil); err != nil {
-		zlog.LogErrorf("fail when writing error back to the http response header, err: %v", err)
-		http.Error(w, fuyaoerrors.ErrStrWritingHttpHeader, http.StatusInternalServerError)
-		return
-	}
-
-	return
 }
 
 func (s *FuyaoAuthorizeServer) generateTokenError(w http.ResponseWriter, err error) error {

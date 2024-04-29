@@ -26,6 +26,7 @@ import (
 	"openfuyao/oauth-server/pkg/oauth2"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
+	"openfuyao/oauth-server/pkg/store"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -56,9 +57,9 @@ func NewOAuthServerAPIServer(
 		cfg.IDPLoginStoreConfig.SessionName, cfg.IDPLoginStoreConfig.SessionMaxAge,
 		[]byte(cfg.IDPLoginStoreConfig.SigningKey), []byte(cfg.IDPLoginStoreConfig.EncryptionKey))
 	loginIPProtector := protector.NewLoginIPProtector(cfg.IPProtectorConfig)
-	login := fuyaopassword.NewLogin(idpLoginStore, k8sClient, loginIPProtector,
-		cfg.LoginConfig.Provider, cfg.LoginConfig.UserNamespace)
-	oauthServer := oauth2.NewOAuthServer(idpLoginStore, k8sClient, cfg.OAuthServerConfig)
+	tokenStore := store.NewK8sSecretStore(k8sClient, cfg.OAuthServerConfig.CodeTokenNamespace)
+	login := fuyaopassword.NewLogin(idpLoginStore, k8sClient, tokenStore, loginIPProtector, cfg.LoginConfig)
+	oauthServer := oauth2.NewOAuthServer(idpLoginStore, tokenStore, cfg.OAuthServerConfig)
 
 	return &OAuthServerAPIServer{
 		Server:      server,
@@ -72,6 +73,7 @@ func NewOAuthServerAPIServer(
 func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
 	s.Router.HandleFunc("/auth/login/fuyaoPasswordProvider", s.Login.LoginHandler)
+	s.Router.HandleFunc("/auth/logout/fuyaoPasswordProvider", s.Login.LogoutHandler)
 	s.Router.HandleFunc("/auth/password/confirm/fuyaoPasswordProvider", s.Login.PasswordConfirmHandler)
 	s.Router.HandleFunc("/auth/password/modify/fuyaoPasswordProvider", s.Login.PasswordResetHandler)
 	s.Router.HandleFunc("/oauth/authorize", s.OAuthServer.OAuthAuthorizeHandler)

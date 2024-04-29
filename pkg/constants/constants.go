@@ -32,10 +32,11 @@ const (
 // Constants for cookie-names
 // 这里openshift加了一个expire time
 const (
-	UserName   = "user.name"
-	UserUID    = "user.uid"
-	UserGroups = "user.groups"
-	UserExtra  = "user.extra"
+	UserName     = "user.name"
+	UserUID      = "user.uid"
+	UserGroups   = "user.groups"
+	UserExtra    = "user.extra"
+	CookieExpiry = "cookie.expiry"
 )
 
 // Constants for code, access, refresh token prefixes

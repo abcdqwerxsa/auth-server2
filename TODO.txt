@@ -2,3 +2,5 @@
 2. 所有cookie/session/auth-code/access-token的expiration time要重新check一下
 3. 验证CSRFtoken的存在
 4. 所有的url写到一个go file中
+5. scope目前还没加check
+6. 重定向可能会有问题

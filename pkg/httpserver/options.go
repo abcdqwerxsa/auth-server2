@@ -69,7 +69,7 @@ func (s *ServerOptions) Validate() []error {
 			}
 		}
 
-		if s.RootCAFile != "" {
+		if s.RootCAFile == "" {
 			errs = append(errs, fuyaoerrors.ErrEmptyMasterCAFile)
 		} else {
 			if _, err := os.Stat(s.RootCAFile); err != nil {

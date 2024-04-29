@@ -16,6 +16,7 @@ package sessions
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/sessions"
 
@@ -28,7 +29,8 @@ type CookieStore struct {
 	// name of the cookie used for session data
 	name string
 	// store of the actual cookie
-	store sessions.Store
+	store  sessions.Store
+	maxAge int
 }
 
 // NewSessionStore inits a session store for idp login state
@@ -37,25 +39,35 @@ func NewSessionStore(name string, maxAge int, secrets ...[]byte) *CookieStore {
 	cookie.Options.MaxAge = maxAge
 	cookie.Options.HttpOnly = true
 	cookie.Options.Secure = true
-	return &CookieStore{name: name, store: cookie}
+	return &CookieStore{name: name, store: cookie, maxAge: maxAge}
 }
 
 // Get fetches the session by request and name
 func (s *CookieStore) Get(r *http.Request) Values {
 	// always use New to avoid global state
 	session, err := s.store.New(r, s.name)
+
 	if err != nil {
 		// just log the error so that we can know what is going on
 		zlog.LogErrorf("failed to decode secure cookie session %s: %v", s.name, err)
 
-		return make(map[interface{}]interface{})
+		return make(Values)
 	}
+
+	// check expiration
+	expiry, ok := Values.GetInt64(session.Values, constants.CookieExpiry)
+	if !ok || time.Now().Unix() >= expiry {
+		return make(Values)
+	}
+
 	return session.Values
 }
 
 // Put stores the new cookie value to response writer
 func (s *CookieStore) Put(w http.ResponseWriter, v Values) error {
-	// using a new request
+	// store cookie expiration time
+	v[constants.CookieExpiry] = time.Now().Add(time.Second * time.Duration(s.maxAge)).Unix()
+
 	r := &http.Request{}
 	session, err := s.store.New(r, s.name)
 	if err != nil {
