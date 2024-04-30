@@ -21,8 +21,8 @@ import (
 	"encoding/json"
 	"errors"
 	"hash"
+	"regexp"
 	"strings"
-	"unicode"
 
 	"golang.org/x/crypto/pbkdf2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,35 +85,28 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, passwd st
 	}
 
 	// check that the password at least contains one lowercase/uppercase letter, one number and one special character
-	var (
-		hasLowercase bool
-		hasUppercase bool
-		hasDigit     bool
-		hasSpecial   bool
-	)
-	for _, char := range passwd {
-		switch {
-		case unicode.IsLower(char):
-			hasLowercase = true
-		case unicode.IsUpper(char):
-			hasUppercase = true
-		case unicode.IsDigit(char):
-			hasDigit = true
-		case unicode.IsPunct(char) || unicode.IsSymbol(char):
-			hasSpecial = true
-		default:
-			continue
-		}
+	reUpperCase := regexp.MustCompile(`[A-Z]`)
+	reLowerCase := regexp.MustCompile(`[a-z]`)
+	reDigit := regexp.MustCompile(`[0-9]`)
+	reSpecialChar := regexp.MustCompile(`[!\"#$%&'()*+,-./:;<=>?@[\]^_{|}~ ]`)
+
+	if (!reUpperCase.MatchString(passwd) && !reLowerCase.MatchString(passwd)) || !reDigit.MatchString(passwd) ||
+		!reSpecialChar.MatchString(passwd) {
+		zlog.LogError("password must contain at least one lowercase letter or one uppercase letter, " +
+			"one number, and one special character")
+		return false
 	}
 
-	if !hasLowercase || !hasUppercase || !hasDigit || !hasSpecial {
-		zlog.LogError("密码必须包含至少一个小写字母、一个大写字母、一个数字和一个特殊字符")
+	// check that the password cannot contain more than two consecutive identical characters
+	reConsecutive := regexp.MustCompile(`(.)\1\1`)
+	if reConsecutive.MatchString(passwd) {
+		zlog.LogError("password cannot contain more than two consecutive identical characters")
 		return false
 	}
 
 	// check whether the password is contained in username / reversed username
 	if strings.Contains(passwd, username) || strings.Contains(passwd, reverseString(username)) {
-		zlog.LogError("密码不能和账号及账号逆序一样")
+		zlog.LogError("password cannot be the same as the account number or the reverse account number")
 		return false
 	}
 
