@@ -134,6 +134,9 @@ const (
 	// ErrStrClientInfoMissing represents an OAuth server option error indicating that the client-info is
 	// incomplete to start the server.
 	ErrStrClientInfoMissing = "the client-info is incomplete to start the server"
+
+	// ErrStrRequestMethodNotAllowed represents the error when requesting method is illegal
+	ErrStrRequestMethodNotAllowed = "request method not allowed"
 )
 
 var (
@@ -259,6 +262,9 @@ var (
 	// ErrClientInfoMissing represents an OAuth server option error indicating that the client-info is incomplete
 	// to start the server.
 	ErrClientInfoMissing = errors.New(ErrStrClientInfoMissing)
+
+	// ErrRequestMethodNotAllowed represents the error when requesting method is illegal
+	ErrRequestMethodNotAllowed = errors.New(ErrStrRequestMethodNotAllowed)
 )
 
 // ErrStatusCode is the mapper from error to http return error

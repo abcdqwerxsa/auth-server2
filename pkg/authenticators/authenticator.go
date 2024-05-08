@@ -98,8 +98,7 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, passwd st
 	}
 
 	// check that the password cannot contain more than two consecutive identical characters
-	reConsecutive := regexp.MustCompile(`(.)\1\1`)
-	if reConsecutive.MatchString(passwd) {
+	if checkOverTwoConsecutiveChars(passwd) {
 		zlog.LogError("password cannot contain more than two consecutive identical characters")
 		return false
 	}
@@ -119,6 +118,27 @@ func reverseString(s string) string {
 		reversed = string(char) + reversed
 	}
 	return reversed
+}
+
+func checkOverTwoConsecutiveChars(s string) bool {
+	count := 1 // counter to keep track of the current character's consecutive occurrences
+
+	// Iterate through the password starting from the second character
+	for i := 1; i < len(s); i++ {
+		// If the current character is the same as the previous character
+		if s[i] == s[i-1] {
+			count++ // Increment the counter
+			// If the count exceeds 2, return true as the password has more than two consecutive identical characters
+			if count > 2 {
+				return true
+			}
+		} else {
+			count = 1 // Reset the counter if the current character is different from the previous one
+		}
+	}
+
+	// If no consecutive characters are found, return false
+	return false
 }
 
 func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username string) (user.Info, string, error) {
@@ -273,6 +293,10 @@ func (a *FuyaoPasswordAuthenticator) ResetPassword(
 
 	// check 旧密码是否正确
 	if ok, err := a.encryptor.VerifyPassword(oldPassword, base64EncryptedOldPassword); !ok || err != nil {
+		if err == nil {
+			zlog.LogError("password verification failed")
+			return fuyaoerrors.ErrPasswordAuthenticationFailed
+		}
 		return err
 	}
 

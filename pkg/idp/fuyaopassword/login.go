@@ -17,7 +17,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
 	"text/template"
@@ -49,8 +48,12 @@ type LoginForm struct {
 
 // OutputHTML writes the contents back to web
 func (l *LoginForm) OutputHTML(w http.ResponseWriter, tpl string, name string) {
-	tplForm := template.Must(template.New(name).Parse(tpl))
-	if err := tplForm.Execute(w, l); err != nil {
+	tplForm, err := template.New(name).Parse(tpl)
+	if err != nil {
+		http.Error(w, fuyaoerrors.ErrStrFailToDisplayLogin, http.StatusInternalServerError)
+		return
+	}
+	if err = tplForm.Execute(w, l); err != nil {
 		http.Error(w, fuyaoerrors.ErrStrFailToDisplayLogin, http.StatusInternalServerError)
 		return
 	}
@@ -94,7 +97,7 @@ func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		// deal with POST
 		l.processLogin(w, r)
 	} else {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 }
@@ -121,6 +124,12 @@ func (l *Login) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // PasswordConfirmHandler works when the user login for the first time
 func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
+	// check http method
+	if r.Method != http.MethodPost {
+		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+
 	// read userinfo from session-store
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
@@ -130,8 +139,13 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// read params from r.url
-	newPassword := r.FormValue(constants.NewPasswordParam)
-	then := r.FormValue(constants.ThenParam)
+	var requestBody PasswordConfirmRequest
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, fuyaoerrors.ErrStrFailToUnmarshalData, http.StatusBadRequest)
+		return
+	}
+	newPassword := requestBody.NewPassword
+	then := requestBody.Then
 	if len(newPassword) == 0 {
 		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
 		return
@@ -158,6 +172,12 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 
 // PasswordResetHandler resets the password
 func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
+	// check http method
+	if r.Method != http.MethodPost {
+		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+
 	// add an access token validation, since all the services are required to expose in this version
 	accessToken, err := l.getAccessToken(r)
 	if err != nil {
@@ -171,9 +191,15 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// read params from r.url
-	username := r.FormValue(constants.UsernameParam)
-	oldPassword := r.FormValue(constants.OriginalPasswordParam)
-	newPassword := r.FormValue(constants.NewPasswordParam)
+	var requestBody PasswordResetRequest
+	if err = json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, fuyaoerrors.ErrStrFailToUnmarshalData, http.StatusBadRequest)
+		return
+	}
+
+	username := requestBody.Username
+	oldPassword := requestBody.OriginalPassword
+	newPassword := requestBody.NewPassword
 	if len(username) == 0 || len(oldPassword) == 0 || len(newPassword) == 0 {
 		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
 		return
@@ -185,7 +211,7 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	zlog.LogInfof("Password Reset succeed for user: %s", username)
 
-	http.Redirect(w, r, "/auth/login", http.StatusFound)
+	http.Redirect(w, r, "/auth/login/fuyaoPasswordProvider", http.StatusFound)
 }
 
 func (l *Login) getAccessToken(r *http.Request) (string, error) {
@@ -200,42 +226,7 @@ func (l *Login) getAccessToken(r *http.Request) (string, error) {
 		}
 	}
 
-	// Try loading from Body
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		// Handle error
-		zlog.LogErrorf("cannot read from request body, err: %v", err)
-		return "", fuyaoerrors.ErrFailToUnmarshalData
-	}
-	defer func() {
-		err = r.Body.Close()
-		if err != nil {
-			zlog.LogError("Error closing request body:", err)
-		}
-	}()
-
-	// Define a struct to hold the JSON data
-	type RequestBody struct {
-		AccessToken string `json:"access-token"`
-	}
-
-	// Unmarshal the JSON data into the struct
-	var requestBody RequestBody
-	err = json.Unmarshal(body, &requestBody)
-	if err != nil {
-		// Handle error
-		zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToUnmarshalData, err)
-		return "", fuyaoerrors.ErrNotLogin
-	}
-
-	// Extract the access token from the request body
-	accessToken := requestBody.AccessToken
-	if accessToken == "" {
-		// Handle case when access-token is not found in request body
-		return "", fuyaoerrors.ErrNotLogin
-	}
-
-	return accessToken, nil
+	return "", fuyaoerrors.ErrNotLogin
 }
 
 func (l *Login) authenticateByWebhook(accessToken string) (bool, error) {
