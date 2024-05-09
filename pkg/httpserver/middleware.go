@@ -45,6 +45,9 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
+		// add cors header
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
 		// Create a new responseLogger
 		rl := &responseLogger{
 			ResponseWriter: w,

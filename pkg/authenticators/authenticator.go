@@ -121,6 +121,7 @@ func reverseString(s string) string {
 }
 
 func checkOverTwoConsecutiveChars(s string) bool {
+	const maxConsecutiveChars = 2
 	count := 1 // counter to keep track of the current character's consecutive occurrences
 
 	// Iterate through the password starting from the second character
@@ -129,7 +130,7 @@ func checkOverTwoConsecutiveChars(s string) bool {
 		if s[i] == s[i-1] {
 			count++ // Increment the counter
 			// If the count exceeds 2, return true as the password has more than two consecutive identical characters
-			if count > 2 {
+			if count > maxConsecutiveChars {
 				return true
 			}
 		} else {

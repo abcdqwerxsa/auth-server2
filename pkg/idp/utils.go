@@ -24,6 +24,7 @@ func GetBaseURL(req *http.Request) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	uri.Scheme, uri.Host = req.URL.Scheme, req.URL.Host
 	uri.RawQuery, uri.Fragment = "", ""
 	return uri, nil

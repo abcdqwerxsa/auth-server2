@@ -75,10 +75,6 @@ func wrapRunOAuthServerServer(c *config.OAuthServerAPIServerConfig, ctx context.
 		}
 	}()
 
-	// The ctx (signals.SetupSignalHandler()) is to control the entire program life cycle,
-	// The ictx(internal context)  is created here to control the life cycle of the
-	// ks-apiserver(http httpserver, sharedInformer etc.)
-	// when config change, stop httpserver and renew context, start new httpserver
 	for {
 		select {
 		case <-ctx.Done():

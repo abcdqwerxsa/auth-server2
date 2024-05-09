@@ -44,6 +44,7 @@ type LoginForm struct {
 	Action    string
 	Then      string
 	CSRFToken string
+	UserName  string
 }
 
 // OutputHTML writes the contents back to web
@@ -124,6 +125,52 @@ func (l *Login) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // PasswordConfirmHandler works when the user login for the first time
 func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		// deal with GET
+		l.renderPasswordConfirmForm(w, r)
+	} else if r.Method == http.MethodPost {
+		// deal with POST
+		l.processPasswordConfirm(w, r)
+	} else {
+		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+}
+
+func (l *Login) renderPasswordConfirmForm(w http.ResponseWriter, r *http.Request) {
+	// 生成 uri
+	uri, err := idp.GetBaseURL(r)
+	if err != nil {
+		http.Error(w, "unable to fetch requestURL", http.StatusInternalServerError)
+		return
+	}
+
+	// fetch then from r
+	then := r.URL.Query().Get(constants.ThenParam)
+	if len(then) == 0 {
+		then = "/"
+	}
+
+	// read userinfo from session-store
+	loginData := l.idpLoginStore.Get(r)
+	username, ok := loginData.GetString(constants.UserName)
+	if !ok {
+		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusUnauthorized)
+		return
+	}
+
+	// 生成loginForm
+	loginForm := LoginForm{
+		Action:   uri.String(),
+		Then:     then,
+		UserName: username,
+	}
+
+	// render form
+	loginForm.OutputHTML(w, templates.DefaultPasswordConfirmTemplateString, constants.PasswordConfirmFormTemplate)
+}
+
+func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	// check http method
 	if r.Method != http.MethodPost {
 		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
@@ -138,14 +185,8 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// read params from r.url
-	var requestBody PasswordConfirmRequest
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
-		http.Error(w, fuyaoerrors.ErrStrFailToUnmarshalData, http.StatusBadRequest)
-		return
-	}
-	newPassword := requestBody.NewPassword
-	then := requestBody.Then
+	newPassword := r.FormValue(constants.NewPasswordParam)
+	then := r.FormValue(constants.ThenParam)
 	if len(newPassword) == 0 {
 		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
 		return
@@ -160,9 +201,16 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// no need to keep the info in idpLoginStore, erase them in the cookie/database
-	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-		zlog.LogWarnf("cannot delete the loginstore used in authorization, err: %v", err)
+	// set first-login to false in the oauth-session
+	ok = loginData.SetLoggedIn()
+	if !ok {
+		zlog.LogError("fail to set first-login state to false, probably due to web modification")
+		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
+		return
+	} else if err := l.idpLoginStore.Put(w, loginData); err != nil {
+		zlog.LogError("fail to store loginState to session")
+		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
+		return
 	}
 	zlog.LogInfof("Password Confirmation succeed for user: %s", username)
 
@@ -210,6 +258,19 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	zlog.LogInfof("Password Reset succeed for user: %s", username)
+
+	// delete the accessToken secret
+	if err = l.TokenStore.RemoveByAccess(context.TODO(), accessToken); err != nil {
+		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+		return
+	}
+
+	// flush the loginState
+	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	http.Redirect(w, r, "/auth/login/fuyaoPasswordProvider", http.StatusFound)
 }
@@ -265,7 +326,7 @@ func (l *Login) renderLoginForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// render form
-	loginForm.OutputHTML(w, templates.DefaultLoginTemplateString, "loginForm")
+	loginForm.OutputHTML(w, templates.DefaultLoginTemplateString, constants.LoginFormTemplate)
 }
 
 func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {

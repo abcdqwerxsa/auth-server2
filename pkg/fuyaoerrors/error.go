@@ -137,6 +137,9 @@ const (
 
 	// ErrStrRequestMethodNotAllowed represents the error when requesting method is illegal
 	ErrStrRequestMethodNotAllowed = "request method not allowed"
+
+	// ErrStrRedirectURIMissing represents the redirect uri is missing
+	ErrStrRedirectURIMissing = "the redirect uri is missing or incomplete"
 )
 
 var (
@@ -265,6 +268,9 @@ var (
 
 	// ErrRequestMethodNotAllowed represents the error when requesting method is illegal
 	ErrRequestMethodNotAllowed = errors.New(ErrStrRequestMethodNotAllowed)
+
+	// ErrRedirectURIMissing represents the redirect uri is missing
+	ErrRedirectURIMissing = errors.New(ErrStrRedirectURIMissing)
 )
 
 // ErrStatusCode is the mapper from error to http return error
@@ -288,4 +294,5 @@ var ErrStatusCode = map[error]int{
 	ErrNotFirstLogin:                http.StatusConflict,
 	ErrNotLogin:                     http.StatusUnauthorized,
 	ErrLoginBlocked:                 http.StatusUnauthorized,
+	ErrRedirectURIMissing:           http.StatusBadRequest,
 }

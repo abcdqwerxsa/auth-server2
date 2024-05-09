@@ -17,10 +17,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-oauth2/oauth2/v4"
@@ -79,19 +79,19 @@ func NewOAuthServer(
 	tokenStore *fuyaostore.K8sSecretStore,
 	cfg *config.OAuthServerConfig,
 ) *FuyaoAuthorizeServer {
+	// init manager and configs
 	manager := manage.NewDefaultManager()
 	manager.SetAuthorizeCodeTokenCfg(
 		&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp,
 			IsGenerateRefresh: cfg.IsGenerateRefresh})
 	manager.SetAuthorizeCodeExp(cfg.AuthCodeExp)
-	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
 
-	// token store
-	manager.MustTokenStorage(store.NewMemoryTokenStore())
-	// generate jwt access token
+	// auth code and jwt access token generator
+	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
 	manager.MapAccessGenerate(
 		generates.NewJWTAccessGenerate(cfg.JWTKeyID, []byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
 
+	// storage
 	clientStore := store.NewClientStore()
 	for client, secret := range cfg.ClientMapper {
 		clientStore.Set(client, &models.Client{
@@ -115,6 +115,13 @@ func NewOAuthServer(
 	srv.SetClientInfoHandler(server.ClientFormHandler)
 	srv.SetAllowGetAccessRequest(false)
 
+	// token extra returns userid
+	srv.SetExtensionFieldsHandler(func(ti oauth2.TokenInfo) map[string]interface{} {
+		fieldsValue := make(map[string]interface{})
+		fieldsValue[constants.TokenUserID] = ti.GetUserID()
+		return fieldsValue
+	})
+
 	return srv
 }
 
@@ -125,22 +132,31 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 
 	req, err := s.ValidateAuthorizeRequest(r)
 	if err != nil {
-		s.wrapReturnErrorHandler(w, s.redirectAuthorizationCodeError(w, req, err))
+		s.redirectAuthorizationCodeError(w, req, err)
 		return
 	}
 
-	// check whether containing sessionID, if so fetching the user
-	// implement through secured-cookie
-	userResponse, ok, err := s.AuthorizeThroughSession(w, r)
+	// check whether containing the oauth-session, if so the user has logged in through passwd
+	// then check if it is the first time to login
+	userResponse, loginStatus, err := s.AuthorizeThroughSession(w, r)
 	if err != nil {
-		s.wrapReturnErrorHandler(w, s.redirectAuthorizationCodeError(w, req, err))
+		s.redirectAuthorizationCodeError(w, req, err)
 		return
 	}
 
-	if !ok {
-		// otherwise redirect to login (using the selected identityProvider)
-		if err = s.RedirectToLogin(req, w, r); err != nil {
-			s.wrapReturnErrorHandler(w, s.redirectAuthorizationCodeError(w, req, err))
+	if loginStatus == constants.LoginFailed {
+		// redirect to log in (using the selected identityProvider)
+		if err = s.RedirectToPage(req, constants.LoginRedirectTemplate, w, r); err != nil {
+			s.redirectAuthorizationCodeError(w, req, err)
+			return
+		}
+		return
+	}
+
+	if loginStatus == constants.FirstLogin {
+		// otherwise redirect to password confirm
+		if err = s.RedirectToPage(req, constants.PasswordConfirmRedirectTemplate, w, r); err != nil {
+			s.redirectAuthorizationCodeError(w, req, err)
 			return
 		}
 		return
@@ -150,7 +166,7 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 	req.UserID = userResponse.User.GetName()
 	ti, err := s.GetAuthorizeToken(ctx, &req.AuthorizeRequest)
 	if err != nil {
-		s.wrapReturnErrorHandler(w, s.redirectAuthorizationCodeError(w, req, err))
+		s.redirectAuthorizationCodeError(w, req, err)
 		return
 	}
 
@@ -164,7 +180,7 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 	}
 
 	// finally we redirect to the client callback interface
-	s.wrapReturnErrorHandler(w, s.redirectAuthorizationCode(w, req, s.GetAuthorizeData(req.ResponseType, ti)))
+	s.redirectAuthorizationCode(w, req, s.GetAuthorizeData(req.ResponseType, ti))
 	return
 }
 
@@ -174,7 +190,7 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 
 	gt, tgr, err := s.ValidationTokenRequest(r)
 	if err != nil {
-		s.wrapReturnErrorHandler(w, s.generateTokenError(w, err))
+		s.generateTokenError(w, err)
 		return
 	}
 
@@ -184,25 +200,26 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 		if delErr := s.deleteExpiredAuthCode(tgr); delErr != nil {
 			zlog.LogErrorf("delete expired auth code goes wrong: err: %v", delErr)
 		}
-		s.wrapReturnErrorHandler(w, s.generateTokenError(w, err))
+		s.generateTokenError(w, err)
 		return
 	}
 
-	s.wrapReturnErrorHandler(w, s.returnAccessToken(w, s.GetTokenData(ti), nil))
+	s.returnAccessToken(w, s.GetTokenData(ti), nil)
 
 	return
 }
 
-// RedirectToLogin redirects to login page when sessionId is missing
-func (s *FuyaoAuthorizeServer) RedirectToLogin(
+// RedirectToPage redirects to login page when sessionId is missing
+func (s *FuyaoAuthorizeServer) RedirectToPage(
 	req *FuyaoAuthorizeRequest,
+	template string,
 	w http.ResponseWriter,
 	r *http.Request,
 ) error {
 	if req.identityProvider != constants.FuyaoIdpProvider {
 		return fuyaoerrors.ErrIdentityProviderIncorrect
 	}
-	loginRedirectURL, err := buildLoginRedirectURL(r, req.identityProvider)
+	loginRedirectURL, err := buildRedirectURL(r, req.identityProvider, template)
 	if err != nil {
 		return err
 	}
@@ -211,13 +228,14 @@ func (s *FuyaoAuthorizeServer) RedirectToLogin(
 	return nil
 }
 
-func buildLoginRedirectURL(r *http.Request, idp string) (*url.URL, error) {
+func buildRedirectURL(r *http.Request, idp string, tpl string) (*url.URL, error) {
 	originalURL := r.URL
+	path := strings.Replace(tpl, "%s", idp, 1)
 
 	redirectURL := &url.URL{
 		Scheme: originalURL.Scheme,
 		Host:   originalURL.Host,
-		Path:   fmt.Sprintf("/auth/login/%s", idp),
+		Path:   path,
 	}
 
 	thenParamVal := originalURL.String()
@@ -253,7 +271,7 @@ func (s *FuyaoAuthorizeServer) ValidateAuthorizeRequest(r *http.Request) (*Fuyao
 func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
 	w http.ResponseWriter,
 	r *http.Request,
-) (*authenticator.Response, bool, error) {
+) (*authenticator.Response, constants.LoginStatus, error) {
 	// fetch the cached user info
 	cookieData := s.idpLoginStore.Get(r)
 
@@ -262,22 +280,18 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
 	groups, ok3 := cookieData.GetArrayString(constants.UserGroups)
 	extras, ok4 := cookieData.GetExtras(constants.UserExtra)
 
-	// if it isn't the first login
-	if ok4 && extras["first-login"][0] == "false" {
-		// immediately delete the userinfo
-		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
-			return nil, false, err
-		}
+	// if it is the first login
+	if ok4 && extras["first-login"][0] == "true" {
+		return nil, constants.FirstLogin, nil
 	}
 
+	// the session is broken, flush it
 	if !ok1 || !ok2 || !ok3 || !ok4 {
-		// the session is broken, flush it
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
 			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
-			return nil, false, err
+			return nil, constants.LoginFailed, err
 		}
-		return nil, false, nil
+		return nil, constants.LoginFailed, nil
 	}
 
 	return &authenticator.Response{
@@ -287,7 +301,7 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
 			Groups: groups,
 			Extra:  extras,
 		},
-	}, true, nil
+	}, constants.LoggedIn, nil
 
 }
 
@@ -314,7 +328,8 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 	if err != nil {
 		zlog.LogErrorf("cannot get auth code, err: %v", err)
 		return err
-	} else if ti != nil && ti.GetCodeCreateAt().Add(ti.GetCodeExpiresIn()).Before(time.Now()) {
+	}
+	if ti != nil && ti.GetCodeCreateAt().Add(ti.GetCodeExpiresIn()).Before(time.Now()) {
 		// delete the auth code
 		if err = s.tokenStore.RemoveByCode(context.Background(), code); err != nil {
 			return err
@@ -323,14 +338,6 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 	}
 
 	return nil
-}
-
-func (s *FuyaoAuthorizeServer) handleError(w http.ResponseWriter, req *FuyaoAuthorizeRequest, err error) error {
-	if fn := s.PreRedirectErrorHandler; fn != nil {
-		return fn(w, &req.AuthorizeRequest, err)
-	}
-
-	return s.redirectAuthorizationCodeError(w, req, err)
 }
 
 func (s *FuyaoAuthorizeServer) wrapReturnErrorHandler(w http.ResponseWriter, err error) {
@@ -346,33 +353,35 @@ func (s *FuyaoAuthorizeServer) redirectAuthorizationCode(
 	w http.ResponseWriter,
 	req *FuyaoAuthorizeRequest,
 	data map[string]interface{},
-) error {
+) {
 	uri, err := s.GetRedirectURI(&req.AuthorizeRequest, data)
 	if err != nil {
-		return err
+		zlog.LogErrorf("%s, err: %s", fuyaoerrors.ErrStrRedirectURIMissing, err)
+		http.Error(w, fuyaoerrors.ErrStrRedirectURIMissing, fuyaoerrors.ErrStatusCode[fuyaoerrors.ErrRedirectURIMissing])
+		return
 	}
 
 	w.Header().Set("Location", uri)
 	w.WriteHeader(http.StatusFound)
-	return nil
+	return
 }
 
 func (s *FuyaoAuthorizeServer) redirectAuthorizationCodeError(
 	w http.ResponseWriter,
 	req *FuyaoAuthorizeRequest,
 	err error,
-) error {
-	if req == nil {
-		return err
-	}
-
+) {
 	data, _, _ := s.GetErrorData(err)
-	return s.redirectAuthorizationCode(w, req, data)
+	if req != nil {
+		s.redirectAuthorizationCode(w, req, data)
+	}
+	return
 }
 
-func (s *FuyaoAuthorizeServer) generateTokenError(w http.ResponseWriter, err error) error {
+func (s *FuyaoAuthorizeServer) generateTokenError(w http.ResponseWriter, err error) {
 	data, statusCode, header := s.GetErrorData(err)
-	return s.returnAccessToken(w, data, header, statusCode)
+	s.returnAccessToken(w, data, header, statusCode)
+	return
 }
 
 func (s *FuyaoAuthorizeServer) returnAccessToken(
@@ -380,10 +389,7 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	data map[string]interface{},
 	header http.Header,
 	statusCode ...int,
-) error {
-	if fn := s.ResponseTokenHandler; fn != nil {
-		return fn(w, data, header, statusCode...)
-	}
+) {
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
@@ -398,5 +404,11 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	}
 
 	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(data)
+	err := json.NewEncoder(w).Encode(data)
+	if err != nil {
+		zlog.LogErrorf("%s, err: %s", fuyaoerrors.ErrStrFailToMarshalData, err)
+		http.Error(w, fuyaoerrors.ErrStrFailToMarshalData, fuyaoerrors.ErrStatusCode[fuyaoerrors.ErrFailToMarshalData])
+	}
+
+	return
 }

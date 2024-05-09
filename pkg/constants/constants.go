@@ -46,6 +46,23 @@ const (
 	RefreshPrefix = "refresh-"
 )
 
+// Constants for access token extension fields
+const (
+	TokenUserID = "user_id"
+)
+
+// Constants for url redirect templates
+const (
+	LoginRedirectTemplate           = "/auth/login/%s"
+	PasswordConfirmRedirectTemplate = "/auth/password/confirm/%s"
+)
+
+// Constants for url form templates
+const (
+	LoginFormTemplate           = "loginForm"
+	PasswordConfirmFormTemplate = "passwordConfirmForm"
+)
+
 // Constants for password complexity check
 const (
 	PasswordMinLen = 8
@@ -56,4 +73,14 @@ const (
 const (
 	MinHttpPort = 0
 	MaxHttpPort = 65536
+)
+
+// LoginStatus stands for when status when checking the auth session
+type LoginStatus int
+
+// Constants for the LoginStatuses
+const (
+	FirstLogin LoginStatus = iota
+	LoggedIn
+	LoginFailed
 )

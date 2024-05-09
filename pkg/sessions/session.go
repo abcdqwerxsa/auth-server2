@@ -133,3 +133,23 @@ func (v Values) GetExtraByKey(key string) ([]string, bool) {
 	ret, ok := extras[key]
 	return ret, ok
 }
+
+// SetLoggedIn set the first-login to false in idpLoginState
+func (v Values) SetLoggedIn() bool {
+	extras, ok := v.GetExtras(constants.UserExtra)
+	if !ok {
+		return false
+	}
+
+	extras["first-login"][0] = "false"
+
+	// serialize extra (map[string][]string)
+	jsonExtra, err := json.Marshal(extras)
+	if err != nil {
+		zlog.LogErrorf("cannot marshal data, err: %v", err)
+		return false
+	}
+	v[constants.UserExtra] = jsonExtra
+
+	return true
+}
