@@ -32,10 +32,10 @@ import (
 	"openfuyao/oauth-server/pkg/authenticators"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/fuyaostore"
 	"openfuyao/oauth-server/pkg/idp"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
-	"openfuyao/oauth-server/pkg/store"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -65,7 +65,7 @@ type Login struct {
 	Provider string
 	// CSRF csrf.CSRF
 	K8sClient        kubernetes.Interface
-	TokenStore       *store.K8sSecretStore
+	TokenStore       *fuyaostore.K8sSecretStore
 	Authenticator    authenticators.PasswordAuthenticator
 	idpLoginStore    *sessions.CookieStore
 	loginIPProtector *protector.LoginIPProtector
@@ -75,7 +75,7 @@ type Login struct {
 func NewLogin(
 	idpLoginStore *sessions.CookieStore,
 	k8sClient kubernetes.Interface,
-	tokenStore *store.K8sSecretStore,
+	tokenStore *fuyaostore.K8sSecretStore,
 	loginIPProtector *protector.LoginIPProtector,
 	loginConfig *config.LoginConfig,
 ) *Login {

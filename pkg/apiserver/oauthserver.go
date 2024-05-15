@@ -21,12 +21,12 @@ import (
 
 	overallconfigs "openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/config"
+	"openfuyao/oauth-server/pkg/fuyaostore"
 	"openfuyao/oauth-server/pkg/httpserver"
 	"openfuyao/oauth-server/pkg/idp/fuyaopassword"
 	"openfuyao/oauth-server/pkg/oauth2"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
-	"openfuyao/oauth-server/pkg/store"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -57,7 +57,7 @@ func NewOAuthServerAPIServer(
 		cfg.IDPLoginStoreConfig.SessionName, cfg.IDPLoginStoreConfig.SessionMaxAge,
 		[]byte(cfg.IDPLoginStoreConfig.SigningKey), []byte(cfg.IDPLoginStoreConfig.EncryptionKey))
 	loginIPProtector := protector.NewLoginIPProtector(cfg.IPProtectorConfig)
-	tokenStore := store.NewK8sSecretStore(k8sClient, cfg.OAuthServerConfig.CodeTokenNamespace)
+	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, cfg.OAuthServerConfig.CodeTokenNamespace)
 	login := fuyaopassword.NewLogin(idpLoginStore, k8sClient, tokenStore, loginIPProtector, cfg.LoginConfig)
 	oauthServer := oauth2.NewOAuthServer(idpLoginStore, tokenStore, cfg.OAuthServerConfig)
 

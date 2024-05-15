@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth-server
+  namespace: fuyao-oauth
+  labels:
+    application: "oauth-server"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: "oauth-server"
+  template:
+    metadata:
+      labels:
+        application: "oauth-server"
+    spec:
+      serviceAccountName: oauth-server
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          effect: "NoSchedule"
+          operator: "Exists"
+      containers:
+        - name: oauth-server
+          image: localhost:5000/oauth-server:upload
+          imagePullPolicy: Always
+          ports:
+            - name: https
+              containerPort: 9096
+          args:
+            - --configFile=config.json
+          volumeMounts:
+            - name: oauth-serving-ca
+              mountPath: /ssl/ca.pem
+              subPath: ca.crt
+            - name: oauth-server-server
+              readOnly: true
+              mountPath: /ssl/server.key
+              subPath: tls.key
+            - name: oauth-server-server
+              readOnly: true
+              mountPath: /ssl/server.crt
+              subPath: tls.crt
+            - name: config-volume
+              readOnly: true
+              subPath: config.json
+              mountPath: /config.json
+      volumes:
+        - name: oauth-serving-ca
+          configMap:
+            name: oauth-serving-ca
+        - name: oauth-server-server
+          secret:
+            secretName: oauth-server-server
+        - name: config-volume
+          configMap:
+            name: oauth-server-config

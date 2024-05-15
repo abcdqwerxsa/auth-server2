@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin
+  namespace: oauth-user
+type: Opaque
+data:
+  # encrypted-password 对应的 password 是 soup4@LL
+  encrypted-password: cHlOa25HRzVVU01PL202T1Ywbnh1cFVqdVZNYURNQVlNeHRSUllnVkZ1eEdUWnlJbFFMaXY0SEk4Um5rVmZNa2FFaVBtbTZYSjhpR0dLOGZqTDgxMFZEcnlUYVlpeW43WWZ6RmN0SlRzSDA9
+  extra: eyJmaXJzdC1sb2dpbiI6WyJmYWxzZSJdfQ==
+  groups: c3lzdGVtOmFkbWlu
+  username: YWRtaW4=

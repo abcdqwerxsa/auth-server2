@@ -16,7 +16,6 @@ package oauth2
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -24,7 +23,7 @@ import (
 	"time"
 
 	"github.com/go-oauth2/oauth2/v4"
-	oauth2errors "github.com/go-oauth2/oauth2/v4/errors"
+	"github.com/go-oauth2/oauth2/v4/errors"
 	"github.com/go-oauth2/oauth2/v4/generates"
 	"github.com/go-oauth2/oauth2/v4/manage"
 	"github.com/go-oauth2/oauth2/v4/models"
@@ -37,9 +36,9 @@ import (
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/fuyaostore"
 	"openfuyao/oauth-server/pkg/generators"
 	"openfuyao/oauth-server/pkg/sessions"
-	fuyaostore "openfuyao/oauth-server/pkg/store"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -103,11 +102,11 @@ func NewOAuthServer(
 	manager.MapTokenStorage(tokenStore)
 
 	srv := NewFuyaoAuthorizeServer(server.NewConfig(), manager, idpLoginStore, tokenStore)
-	srv.SetInternalErrorHandler(func(err error) (re *oauth2errors.Response) {
+	srv.SetInternalErrorHandler(func(err error) (re *errors.Response) {
 		log.Println("Internal Error:", err.Error())
 		return
 	})
-	srv.SetResponseErrorHandler(func(re *oauth2errors.Response) {
+	srv.SetResponseErrorHandler(func(re *errors.Response) {
 		log.Println("Response Error:", re.Error.Error())
 	})
 
@@ -307,16 +306,6 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
 
 // GetErrorData forms the error return data for oauth2.0
 func (s *FuyaoAuthorizeServer) GetErrorData(err error) (map[string]interface{}, int, http.Header) {
-	// deal with incorrect identity_provider error
-	if errors.Is(err, fuyaoerrors.ErrIdentityProviderIncorrect) {
-		data := make(map[string]interface{})
-		data["error"] = "incorrect_identity_provider"
-		data["error_code"] = http.StatusBadRequest
-		data["error_description"] = fuyaoerrors.ErrStrIdentityProviderIncorrect
-		header := make(http.Header)
-		return data, http.StatusBadRequest, header
-	}
-
 	return s.Server.GetErrorData(err)
 }
 
@@ -379,8 +368,8 @@ func (s *FuyaoAuthorizeServer) redirectAuthorizationCodeError(
 }
 
 func (s *FuyaoAuthorizeServer) generateTokenError(w http.ResponseWriter, err error) {
-	data, statusCode, header := s.GetErrorData(err)
-	s.returnAccessToken(w, data, header, statusCode)
+	errorData, code, errorHeader := s.GetErrorData(err)
+	s.returnAccessToken(w, errorData, errorHeader, code)
 	return
 }
 
@@ -391,8 +380,8 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	statusCode ...int,
 ) {
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Cache-Control", "no-store")
 
 	for key := range header {
 		w.Header().Set(key, header.Get(key))

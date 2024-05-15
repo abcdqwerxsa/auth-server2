@@ -1,0 +1,42 @@
+{
+  "HttpServerConfig": {
+    "HttpsPort": 9096,
+    "TlsCertFile": "/ssl/server.crt",
+    "TlsPrivateKeyFile": "/ssl/server.key",
+    "RootCAFile": "/ssl/ca.pem"
+  },
+  "IDPLoginStoreConfig": {
+    "SessionName": "idpLogin",
+    "SessionMaxAge": 300,
+    "SigningKey": "auth",
+    "EncryptionKey": "encrypt123123123"
+  },
+  "IPProtectorConfig": {
+    "FailTimes": 5,
+    "FailDuration": "5m",
+    "LockDuration": "30m"
+  },
+  "K8sConfig": {
+    "KubeConfigFile": "",
+    "QPS": 1e6,
+    "Burst": 1e6
+  },
+  "LoginConfig": {
+    "Provider": "fuyaoPasswordProvider",
+    "UserNamespace": "oauth-user"
+  },
+  "OAuthServerConfig": {
+    "CodeTokenNamespace": "oauth-code-token",
+    "AuthCodeExp": "5m",
+    "AccessTokenExp": "8760h",
+    "RefreshTokenExp": "2h",
+    "IsGenerateRefresh": false,
+    "JWTKeyID": "access_token_sign_key",
+    "JWTPrivateKey": "i_am_the_secrets",
+    "ClientMapper": {
+      "console": "console-password",
+      "oauth-proxy": "SECRETTS"
+    }
+  },
+  "JWTPrivateKey": "i_am_the_secrets"
+}

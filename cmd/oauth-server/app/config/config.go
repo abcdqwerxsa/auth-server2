@@ -175,7 +175,7 @@ func (i *IPProtectorConfig) Validate() []error {
 	return errs
 }
 
-// IDPLoginStoreConfig configures the store that temporally saves the user info
+// IDPLoginStoreConfig configures the fuyaostore that temporally saves the user info
 type IDPLoginStoreConfig struct {
 	SessionName   string `json:"SessionName"`
 	SessionMaxAge int    `json:"SessionMaxAge"`

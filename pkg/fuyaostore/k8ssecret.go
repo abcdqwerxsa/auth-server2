@@ -10,8 +10,8 @@
  * See the Mulan PSL v2 for more details.
  */
 
-// Package store defines how to store the auth code and access token
-package store
+// Package fuyaostore defines how to fuyaostore the auth code and access token
+package fuyaostore
 
 import (
 	"context"
@@ -34,7 +34,7 @@ import (
 type K8sSecretStore struct {
 	// k8s client
 	k8sClient kubernetes.Interface
-	// store namespace
+	// fuyaostore namespace
 	ns string
 }
 
