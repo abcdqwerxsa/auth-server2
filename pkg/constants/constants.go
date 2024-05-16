@@ -19,6 +19,7 @@ const (
 	CSRFParam     = "csrf_token"
 	UsernameParam = "username"
 	PasswordParam = "password"
+	ErrorParam    = "error"
 
 	NewPasswordParam      = "new_password"
 	OriginalPasswordParam = "original_password"
@@ -83,4 +84,9 @@ const (
 	FirstLogin LoginStatus = iota
 	LoggedIn
 	LoginFailed
+)
+
+// Constants for decimal value
+const (
+	Decimal = 10
 )

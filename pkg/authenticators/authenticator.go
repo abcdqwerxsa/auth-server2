@@ -263,6 +263,21 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, passwd string, first
 
 // ConfirmPassword is used when the user first logins in
 func (a *FuyaoPasswordAuthenticator) ConfirmPassword(ctx context.Context, username, newPassword string) error {
+	// 提取旧的加密密码
+	_, base64EncryptedOldPassword, err := a.fetchUserInfoAndStoredPassword(username)
+	if err != nil {
+		return err
+	}
+
+	// check 旧密码是否没有改
+	if ok, err := a.encryptor.VerifyPassword(newPassword, base64EncryptedOldPassword); ok || err != nil {
+		if err == nil {
+			zlog.LogError("password verification failed")
+			return fuyaoerrors.ErrPasswordSame
+		}
+		return err
+	}
+
 	// 校验 password 复杂度
 	if ok := a.checkPasswordComplexity(username, newPassword); !ok {
 		return fuyaoerrors.ErrPasswordTooWeak

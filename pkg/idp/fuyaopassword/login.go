@@ -15,9 +15,14 @@ package fuyaopassword
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math/big"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -45,6 +50,7 @@ type LoginForm struct {
 	Then      string
 	CSRFToken string
 	UserName  string
+	Error     string
 }
 
 // OutputHTML writes the contents back to web
@@ -93,7 +99,7 @@ func NewLogin(
 func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// deal with GET
-		l.renderLoginForm(w, r)
+		l.handleLoginForm(w, r)
 	} else if r.Method == http.MethodPost {
 		// deal with POST
 		l.processLogin(w, r)
@@ -103,7 +109,7 @@ func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// LogoutHandler in openFuyao fuyaoPasswordProvider delete the accessToken secret
+// LogoutHandler Deprecated! in openFuyao fuyaoPasswordProvider delete the loginState
 func (l *Login) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	// check logged in status
 	accessToken, err := l.getAccessToken(r)
@@ -116,10 +122,13 @@ func (l *Login) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
 	}
 
-	// delete the accessToken secret
-	if err = l.TokenStore.RemoveByAccess(context.TODO(), accessToken); err != nil {
-		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+	// flush the loginState
+	if err = l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
 	return
 }
 
@@ -127,7 +136,7 @@ func (l *Login) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// deal with GET
-		l.renderPasswordConfirmForm(w, r)
+		l.handlePasswordConfirmForm(w, r)
 	} else if r.Method == http.MethodPost {
 		// deal with POST
 		l.processPasswordConfirm(w, r)
@@ -137,7 +146,7 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (l *Login) renderPasswordConfirmForm(w http.ResponseWriter, r *http.Request) {
+func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request) {
 	// 生成 uri
 	uri, err := idp.GetBaseURL(r)
 	if err != nil {
@@ -150,6 +159,9 @@ func (l *Login) renderPasswordConfirmForm(w http.ResponseWriter, r *http.Request
 	if len(then) == 0 {
 		then = "/"
 	}
+
+	// get error from r
+	errString := r.URL.Query().Get(constants.ErrorParam)
 
 	// read userinfo from session-store
 	loginData := l.idpLoginStore.Get(r)
@@ -164,6 +176,7 @@ func (l *Login) renderPasswordConfirmForm(w http.ResponseWriter, r *http.Request
 		Action:   uri.String(),
 		Then:     then,
 		UserName: username,
+		Error:    errString,
 	}
 
 	// render form
@@ -188,7 +201,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	newPassword := r.FormValue(constants.NewPasswordParam)
 	then := r.FormValue(constants.ThenParam)
 	if len(newPassword) == 0 {
-		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
+		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrUsernameOrPasswordMissing, then)
 		return
 	}
 	if len(then) == 0 {
@@ -197,7 +210,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 
 	// password confirmation logic
 	if err := l.Authenticator.ConfirmPassword(context.Background(), username, newPassword); err != nil {
-		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+		redirectGetMethodWithError(w, r, err.Error(), then)
 		return
 	}
 
@@ -259,12 +272,6 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	zlog.LogInfof("Password Reset succeed for user: %s", username)
 
-	// delete the accessToken secret
-	if err = l.TokenStore.RemoveByAccess(context.TODO(), accessToken); err != nil {
-		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
-		return
-	}
-
 	// flush the loginState
 	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
 		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
@@ -305,24 +312,29 @@ func (l *Login) authenticateByWebhook(accessToken string) (bool, error) {
 	return tokenReviewResponse.Status.Authenticated, nil
 }
 
-func (l *Login) renderLoginForm(w http.ResponseWriter, r *http.Request) {
+func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	// 生成 uri
 	uri, err := idp.GetBaseURL(r)
 	if err != nil {
+		zlog.LogErrorf("unable to fetch requestURL, err: %v", err)
 		http.Error(w, "unable to fetch requestURL", http.StatusInternalServerError)
 		return
 	}
 
-	// 生成csrf token，从r中抽取then
+	// 从r中抽取then
 	then := r.URL.Query().Get(constants.ThenParam)
 	if len(then) == 0 {
 		then = "/"
 	}
 
+	// get error from r
+	errString := r.URL.Query().Get(constants.ErrorParam)
+
 	// 生成loginForm
 	loginForm := LoginForm{
 		Action: uri.String(),
 		Then:   then,
+		Error:  errString,
 	}
 
 	// render form
@@ -338,7 +350,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// check form value
 	if len(username) == 0 || len(password) == 0 {
-		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
+		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrUsernameOrPasswordMissing, then)
 		return
 	}
 	if len(then) == 0 {
@@ -349,8 +361,10 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// login devastation check
 	ipAddress := getIPAddress(r)
-	if l.loginIPProtector.IsLocked(ipAddress) {
-		http.Error(w, fuyaoerrors.ErrStrLoginBlocked, http.StatusUnauthorized)
+	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
+		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
+			strconv.FormatInt(remainingTime, constants.Decimal), 1)
+		redirectGetMethodWithError(w, r, errString, then)
 		return
 	}
 
@@ -359,15 +373,28 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// service internal error
 	if err != nil && !errors.Is(err, fuyaoerrors.ErrPasswordAuthenticationFailed) {
-		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
+		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrLoginServiceDown, then)
 		return
 	}
 
 	// password authentication error
 	if !ok {
 		// current ip failed times +1
-		l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
-		http.Error(w, fuyaoerrors.ErrStrPasswordAuthenticationFailed, http.StatusUnauthorized)
+		remainingAttempt := l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
+
+		// still got login attempts
+		if remainingAttempt > 0 {
+			errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedWithCount, "%s",
+				strconv.FormatInt(int64(remainingAttempt), constants.Decimal), 1)
+			redirectGetMethodWithError(w, r, errString, then)
+			return
+		}
+
+		// trigger ip blocking
+		lockDuration := int64(l.loginIPProtector.LockDuration.Minutes())
+		errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedLocked, "%s",
+			strconv.FormatInt(lockDuration, constants.Decimal), 1)
+		redirectGetMethodWithError(w, r, errString, then)
 		return
 	}
 
@@ -375,12 +402,11 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	l.loginIPProtector.Unlock(ipAddress)
 
 	if err = l.saveLoginStateToSession(response.User, w); err != nil {
-		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
+		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrLoginServiceDown, then)
 		return
 	}
 
 	zlog.LogInfof("Successfully logging in with %s", response.User.GetName())
-
 	// 重定向回到 /oauth/authorize
 	http.Redirect(w, r, then, http.StatusFound)
 }
@@ -392,7 +418,15 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 	values[constants.UserGroups] = user.GetGroups()
 
 	// serialize extra (map[string][]string)
-	jsonExtra, err := json.Marshal(user.GetExtra())
+	extra := user.GetExtra()
+
+	// add the web-oauthserver session-id
+	const sessionIDLength = 32
+	sessionID, err := generateSessionID(sessionIDLength)
+	extra[constants.OAuthServerSessionID] = []string{sessionID}
+
+	// save the extra information
+	jsonExtra, err := json.Marshal(extra)
 	if err != nil {
 		zlog.LogErrorf("cannot marshal data, err: %v", err)
 		return fuyaoerrors.ErrFailToMarshalData
@@ -410,4 +444,30 @@ func getIPAddress(r *http.Request) string {
 	ip := ipParts[0]
 
 	return ip
+}
+
+func redirectGetMethodWithError(w http.ResponseWriter, r *http.Request, errString, then string) {
+	// build redirect url
+	encodedErrString := url.QueryEscape(errString)
+	encodedThen := url.QueryEscape(then)
+	redirect := fmt.Sprintf("%s?then=%s&error=%s", r.URL.String(), encodedThen, encodedErrString)
+
+	// redirect to GET handleLogin
+	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+func generateSessionID(length int) (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	sessionID := make([]byte, length)
+
+	for i := 0; i < length; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			zlog.LogErrorf("Cannot generate random char, err: %v", err)
+			return "", err
+		}
+		sessionID[i] = charset[num.Int64()]
+	}
+
+	return string(sessionID), nil
 }

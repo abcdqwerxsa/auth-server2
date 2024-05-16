@@ -29,9 +29,23 @@ const (
         <div class="form-block">
             <h3>欢迎登录openFuyao</h3>
             <form id="login-form" autocomplete="off" action="{{.Action}}" method="POST">
+              <div class="error-placeholder">
+                {{ if .Error }}
+                <p class="pf-c-form__helper-text pf-m-error">
+                  <svg style="vertical-align:-0.125em" fill="currentColor" height="1em" width="1em" viewBox="0 0` +
+		` 512 512" aria-hidden="true" role="img" class="pf-m-error__icon">
+                    <path d="M504 256c0 136.997-111.043 248-248 248S8 392.997 8 256C8 119.083 119.043 8 256 8s248` +
+		` 111.083 248 248zm-248 50c-25.405 0-46 20.595-46 46s20.595 46 46 46 46-20.595 46-46-20.595-46-46-46zm-43` +
+		`.673-165.346l7.418 136c.347 6.364 5.609 11.346 11.982 11.346h48.546c6.373 0 11.635-4.982 11.982-11.346l7.` +
+		`418-136c.375-6.874-5.098-12.654-11.982-12.654h-63.383c-6.884 0-12.356 5.78-11.981 12.654z" transform=""></path>
+                  </svg>
+                  {{ .Error }}
+                </p>
+                {{ end }}
+              </div>
                 <label class="form-label required-label" for="username">用户名</label>
                 <div class="form-input-line">
-                    <input id="username" name="username" type="text" value="" required>
+                    <input id="username" name="username" type="text" value="" required="">
                 </div>
                 <div class="alert-line hidden-alert">请输入用户名!</div>
                 <label class="form-label required-label" for="password">密码</label>
@@ -60,13 +74,13 @@ const (
                             </path>
                         </svg>
                     </span>
-                    <input class="password-input" id="password" name="password" type="password" required>
+                    <input class="password-input" id="password" name="password" type="password" required="">
                 </div>
                 <div class="alert-line hidden-alert">请输入密码!</div>
-                <div><input id="csrf_token" name="csrf_token" type="text" value="{{.CSRFToken}}" hidden></div>
-                <div><input id="then" name="then" type="text" value="{{.Then}}" hidden></div>
+                <div><input id="csrf_token" name="csrf_token" type="text" value="{{.CSRFToken}}" hidden=""></div>
+                <div><input id="then" name="then" type="text" value="{{.Then}}" hidden=""></div>
                 <div class="btn-block"><button type="submit" id="login-btn" class="btn-primary login-btn" ` +
-		`formnovalidate><span>登录</span></button>
+		`formnovalidate=""><span>登录</span></button>
                 </div>
             </form>
         </div>
@@ -93,16 +107,6 @@ const (
         const usernameAlert = document.getElementsByClassName("alert-line")[0]
         const passwordAlert = document.getElementsByClassName("alert-line")[1]
 
-        const updateLoginBtn = () => {
-            btnValid = usernameValid && passwordValid;
-            const btn = document.getElementById('login-btn');
-            if (btnValid) {
-                btn.disabled = false;
-            } else {
-                btn.disabled = true;
-            }
-        }
-
         const switchAlertVisibility = (inputAlert, testRes) => {
             if (testRes) {
                 inputAlert.classList.add("hidden-alert");
@@ -114,19 +118,17 @@ const (
         document.getElementById("username").addEventListener("input", (event) => {
             usernameValid = event.target.value.length > 0
             switchAlertVisibility(usernameAlert, usernameValid)
-            updateLoginBtn()
         })
 
         document.getElementById("password").addEventListener("input", (event) => {
             passwordValid = event.target.value.length > 0
             switchAlertVisibility(passwordAlert, passwordValid)
-            updateLoginBtn()
         })
 
-        document.getElementById("login-form").addEventListener("submit", (event) => {
+        document.getElementById("login-btn").addEventListener("click", (event) => {
             switchAlertVisibility(usernameAlert, usernameValid)
             switchAlertVisibility(passwordAlert, passwordValid)
-            if (!usernameAlert || !passwordValid) {
+            if (!usernameValid || !passwordValid) {
                 event.preventDefault()
             }
         })
@@ -189,7 +191,8 @@ const (
         .cancel-btn{background-color:#fff!important;color:black;border:1px solid #ccc!important}
         .cancel-btn:hover{background-color:#f8f8f8!important}
         .cancel-btn:active{background-color:#e8e8e8!important}
-        
+        .error-placeholder {fill: #fff2f0;}
+        .pf-m-error__icon {stroke: #e94547;}
     </style>
 </body>
 
@@ -213,6 +216,20 @@ const (
             <h3>初次修改密码</h3>
             <div class="prompt-line prompt-default prompt-info">为确保您的账户安全，初次登陆后请修改密码</div>
             <form id="confirm-form" autocomplete="off" action="{{.Action}}" method="POST">
+              <div class="error-placeholder">
+                {{ if .Error }}
+                <p class="pf-c-form__helper-text pf-m-error">
+                  <svg style="vertical-align:-0.125em" fill="currentColor" height="1em" width="1em" viewBox="0 0` +
+		` 512 512" aria-hidden="true" role="img" class="pf-m-error__icon">
+                    <path d="M504 256c0 136.997-111.043 248-248 248S8 392.997 8 256C8 119.083 119.043 8 256 8s248` +
+		` 111.083 248 248zm-248 50c-25.405 0-46 20.595-46 46s20.595 46 46 46 46-20.595 46-46-20.595-46-46-46zm-43` +
+		`.673-165.346l7.418 136c.347 6.364 5.609 11.346 11.982 11.346h48.546c6.373 0 11.635-4.982 11.982-11.346l7.` +
+		`418-136c.375-6.874-5.098-12.654-11.982-12.654h-63.383c-6.884 0-12.356 5.78-11.981 12.654z" transform=""></path>
+                  </svg>
+                  {{ .Error }}
+                </p>
+                {{ end }}
+              </div>
                 <label class="form-label required-label" for="new-password">新密码</label>
                 <div class="form-input-line">
                     <span role="img" tabindex="-1" class="password-input-icon" onclick="togglePassword(this)">
@@ -280,7 +297,6 @@ const (
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden></div>
                 <div class="prompt-line prompt-default prompt-error">两次输入密码需要一致</div>
                 <div class="btn-block">
-                    <button class="cancel-btn"><span>取消</span></button>
                     <button id="confirm-btn" type="submit" class="btn-primary confirm-btn"
                         formnovalidate><span>确认</span></button>
                 </div>

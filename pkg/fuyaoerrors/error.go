@@ -35,11 +35,19 @@ const (
 
 	// ErrStrPasswordAuthenticationFailed represents an internal runtime error indicating incorrect
 	// username or password during authentication.
-	ErrStrPasswordAuthenticationFailed = "incorrect username or password"
+	ErrStrPasswordAuthenticationFailed = "用户名或密码错误"
+
+	// ErrStrPasswordAuthenticationFailedWithCount represents an internal runtime error indicating incorrect
+	// username or password during authentication, and will also return the remaining attempt counts
+	ErrStrPasswordAuthenticationFailedWithCount = "用户名或密码错误，再输错 %s 次用户将锁定"
+
+	// ErrStrPasswordAuthenticationFailedLocked represents an internal runtime error indicating incorrect
+	// username or password during authentication, and will block the ip for sometime
+	ErrStrPasswordAuthenticationFailedLocked = "用户名或密码错误，用户已经被锁定，请 %s 分钟后重试"
 
 	// ErrStrPasswordSame represents an internal runtime error indicating that the new password is the same as the
 	// original password.
-	ErrStrPasswordSame = "the new password is the same as the original password"
+	ErrStrPasswordSame = "新输入的密码和旧密码相同"
 
 	// ErrStrPasswordTooWeak represents an internal runtime error indicating that the input new password cannot
 	// pass the complexity check.
@@ -83,7 +91,7 @@ const (
 
 	// ErrStrLoginBlocked represents an internal runtime error indicating that the request is blocked due to
 	// multiple failed login attempts.
-	ErrStrLoginBlocked = "request is blocked due to multiple failed login attempts"
+	ErrStrLoginBlocked = "账户锁定中，请等待 %s 分钟后重试"
 
 	// ErrStrInvalidHttpAndHttpsPort represents an HTTP server error indicating that both HTTP and HTTPS ports
 	// cannot be invalid at the same time.
