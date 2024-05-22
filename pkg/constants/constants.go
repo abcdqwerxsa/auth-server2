@@ -23,6 +23,10 @@ const (
 
 	NewPasswordParam      = "new_password"
 	OriginalPasswordParam = "original_password"
+
+	SessionIDParam      = "session_id"
+	LogoutEndpointParam = "logout_endpoint"
+	CodeParam           = "code"
 )
 
 // FuyaoIdpProvider Constants for identity provider
@@ -33,11 +37,13 @@ const (
 // Constants for cookie-names
 // 这里openshift加了一个expire time
 const (
-	UserName     = "user.name"
-	UserUID      = "user.uid"
-	UserGroups   = "user.groups"
-	UserExtra    = "user.extra"
-	CookieExpiry = "cookie.expiry"
+	UserName             = "user.name"
+	UserUID              = "user.uid"
+	UserGroups           = "user.groups"
+	UserExtra            = "user.extra"
+	CookieExpiry         = "cookie.expiry"
+	UserFirstLogin       = "first-login"
+	OAuthServerSessionID = "session-id"
 )
 
 // Constants for code, access, refresh token prefixes

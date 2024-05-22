@@ -73,7 +73,7 @@ func NewOAuthServerAPIServer(
 func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
 	s.Router.HandleFunc("/auth/login/fuyaoPasswordProvider", s.Login.LoginHandler)
-	s.Router.HandleFunc("/auth/logout/fuyaoPasswordProvider", s.Login.LogoutHandler)
+	s.Router.HandleFunc("/auth/logout/fuyaoPasswordProvider", s.OAuthServer.SingleLogoutHandler)
 	s.Router.HandleFunc("/auth/password/confirm/fuyaoPasswordProvider", s.Login.PasswordConfirmHandler)
 	s.Router.HandleFunc("/auth/password/modify/fuyaoPasswordProvider", s.Login.PasswordResetHandler)
 	s.Router.HandleFunc("/oauth/authorize", s.OAuthServer.OAuthAuthorizeHandler)

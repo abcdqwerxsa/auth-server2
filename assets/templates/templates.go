@@ -32,8 +32,8 @@ const (
               <div class="error-placeholder">
                 {{ if .Error }}
                 <p class="pf-c-form__helper-text pf-m-error">
-                  <svg style="vertical-align:-0.125em" fill="currentColor" height="1em" width="1em" viewBox="0 0` +
-		` 512 512" aria-hidden="true" role="img" class="pf-m-error__icon">
+                  <svg style="vertical-align:-0.125em" fill="currentColor" height="1em" width="1em" viewBox=` +
+		`"0 0 512 512" aria-hidden="true" role="img" class="pf-m-error__icon">
                     <path d="M504 256c0 136.997-111.043 248-248 248S8 392.997 8 256C8 119.083 119.043 8 256 8s248` +
 		` 111.083 248 248zm-248 50c-25.405 0-46 20.595-46 46s20.595 46 46 46 46-20.595 46-46-20.595-46-46-46zm-43` +
 		`.673-165.346l7.418 136c.347 6.364 5.609 11.346 11.982 11.346h48.546c6.373 0 11.635-4.982 11.982-11.346l7.` +
@@ -87,12 +87,9 @@ const (
     </div>
     <script>
         const togglePassword = (element) => {
+            // Toggle visibility of the SVG paths
             element.querySelectorAll('path').forEach((path) => {
-                if (path.style.display === 'none') {
-                    path.style.display = '';
-                } else {
-                    path.style.display = 'none';
-                }
+                path.style.display = (path.style.display === 'none') ? '' : 'none';
             });
             const input = element.nextElementSibling;
             if (input.type === 'password') {
@@ -173,8 +170,8 @@ const (
         .alert-line.hidden-alert{opacity:0}
         .form-block .required-label::before{margin-inline-end:.25em;color:#ff4d4f;font-family:SimSun,sans-serif;` +
 		`content:"*"}
-        .form-block input{box-sizing:border-box;padding:0 .5em;line-height:22px;height:32px;width:100%;border-` +
-		`radius:2px;background:#fff;border:1px solid #d9d9d9}
+        .form-block input{box-sizing:border-box;padding:0 .5em;line-height:22px;height:32px;width:100%;` +
+		`border-radius:2px;background:#fff;border:1px solid #d9d9d9}
         .form-input-line{position:relative}
         .form-input-line .password-input{padding-right:7%}
         .password-input-icon{position:absolute;top:50%;right:2.5%;transform:translateY(-50%);display:flex;align-` +
@@ -182,7 +179,8 @@ const (
         .password-input-icon:hover{color:#2c2c2c}
         .password-input-icon:hover+input,.form-block input:hover{border:1px solid #4096ff}
         .form-block input:focus{border:1px solid #1677ff;box-shadow:0 0 0 2px rgba(5,145,255,0.1)}
-        .btn-block{margin-top:24px;display:flex;gap:1em;justify-content:right}
+        .btn-block{margin-top:24px;display:flex;gap:1em;` +
+		`justify-content:right}
         .btn-block button{width:96px;height:32px;border:0;border-radius:2px;cursor:pointer}
         .btn-primary{color:white;background-color:#356ac4}
         .btn-primary:hover{background-color:#4b8bea}

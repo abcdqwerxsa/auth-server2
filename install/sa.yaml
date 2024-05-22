@@ -19,11 +19,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: oauth-user-rolebinding
-  namespace: oauth-user  # RoleBinding 所属的命名空间，这里假设为 oauth-server
+  namespace: oauth-user  # RoleBinding 所属的命名空间
 subjects:
   - kind: ServiceAccount
-    name: oauth-server  # 绑定到的 ServiceAccount 名称，这里假设为 oauth-server
-    namespace: fuyao-oauth  # ServiceAccount 所属的命名空间，这里假设为 oauth-server
+    name: oauth-server  # 绑定到的 ServiceAccount 名称
+    namespace: fuyao-oauth  # ServiceAccount 所属的命名空间
 roleRef:
   kind: Role
   name: oauth-user-role  # 引用的 Role 名称
@@ -44,11 +44,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: oauth-code-token-rolebinding
-  namespace: oauth-code-token  # RoleBinding 所属的命名空间，这里假设为 oauth-server
+  namespace: oauth-code-token  # RoleBinding 所属的命名空间
 subjects:
   - kind: ServiceAccount
-    name: oauth-server  # 绑定到的 ServiceAccount 名称，这里假设为 oauth-server
-    namespace: fuyao-oauth  # ServiceAccount 所属的命名空间，这里假设为 oauth-server
+    name: oauth-server  # 绑定到的 ServiceAccount 名称
+    namespace: fuyao-oauth  # ServiceAccount 所属的命名空间
 roleRef:
   kind: Role
   name: oauth-code-token-role  # 引用的 Role 名称

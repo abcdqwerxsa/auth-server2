@@ -39,6 +39,7 @@ func NewSessionStore(name string, maxAge int, secrets ...[]byte) *CookieStore {
 	cookie.Options.MaxAge = maxAge
 	cookie.Options.HttpOnly = true
 	cookie.Options.Secure = true
+	cookie.Options.SameSite = http.SameSiteNoneMode
 	return &CookieStore{name: name, store: cookie, maxAge: maxAge}
 }
 
@@ -141,7 +142,7 @@ func (v Values) SetLoggedIn() bool {
 		return false
 	}
 
-	extras["first-login"][0] = "false"
+	extras[constants.UserFirstLogin][0] = "false"
 
 	// serialize extra (map[string][]string)
 	jsonExtra, err := json.Marshal(extras)

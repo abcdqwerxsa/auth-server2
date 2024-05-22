@@ -37,6 +37,5 @@
       "console": "console-password",
       "oauth-proxy": "SECRETTS"
     }
-  },
-  "JWTPrivateKey": "i_am_the_secrets"
+  }
 }

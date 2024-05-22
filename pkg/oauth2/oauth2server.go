@@ -14,8 +14,11 @@
 package oauth2
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -56,6 +59,10 @@ type FuyaoAuthorizeServer struct {
 	idpLoginStore *sessions.CookieStore
 	// tokenStore stores the code/access-token in the k8s secret
 	tokenStore oauth2.TokenStore
+	// oauthProxyStore stores the sessionID and logout endpoints for each oauth-proxy component
+	oauthProxyStore map[string]map[string]string
+	// authCode2SessionID maps each auth-code to the central sessionID
+	authCode2SessionID map[string]string
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer
@@ -66,9 +73,11 @@ func NewFuyaoAuthorizeServer(
 	tokenStore oauth2.TokenStore,
 ) *FuyaoAuthorizeServer {
 	return &FuyaoAuthorizeServer{
-		Server:        server.NewServer(cfg, manager),
-		idpLoginStore: idpLoginStore,
-		tokenStore:    tokenStore,
+		Server:             server.NewServer(cfg, manager),
+		idpLoginStore:      idpLoginStore,
+		tokenStore:         tokenStore,
+		oauthProxyStore:    make(map[string]map[string]string),
+		authCode2SessionID: make(map[string]string),
 	}
 }
 
@@ -178,8 +187,28 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 		req.RedirectURI = client.GetDomain()
 	}
 
+	// store the map from auth-code to oauth-server sessionID for single sign out
+	s.storeToCodeSessionIDMapper(r, ti)
+
 	// finally we redirect to the client callback interface
 	s.redirectAuthorizationCode(w, req, s.GetAuthorizeData(req.ResponseType, ti))
+	return
+}
+
+func (s *FuyaoAuthorizeServer) storeToCodeSessionIDMapper(r *http.Request, ti oauth2.TokenInfo) {
+	// fetch auth-code
+	code := ti.GetCode()
+
+	// fetch the cached user info
+	cookieData := s.idpLoginStore.Get(r)
+	sessionArray, ok := cookieData.GetExtraByKey(constants.OAuthServerSessionID)
+	if !ok {
+		zlog.LogWarn("the oauth-server cookie does not contain web-oauthserver sessionid")
+		return
+	}
+	oauthServerSessionID := sessionArray[0]
+
+	s.authCode2SessionID[code] = oauthServerSessionID
 	return
 }
 
@@ -193,6 +222,8 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	s.registerOauthProxyComponents(r)
+
 	ti, err := s.GetAccessToken(ctx, gt, tgr)
 	if err != nil {
 		// delete expired authorization code
@@ -205,6 +236,31 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 
 	s.returnAccessToken(w, s.GetTokenData(ti), nil)
 
+	return
+}
+
+func (s *FuyaoAuthorizeServer) registerOauthProxyComponents(r *http.Request) {
+	// fetch the component sessionID parameter
+	sessionID := r.FormValue(constants.SessionIDParam)
+	proxyLogoutEndpoint := r.FormValue(constants.LogoutEndpointParam)
+	code := r.FormValue(constants.CodeParam)
+	if sessionID == "" || proxyLogoutEndpoint == "" {
+		zlog.LogWarn("request does not have the session_id or logout endpoint parameter for single logout")
+		return
+	}
+
+	// fetch the idpLogin sessionID
+	oauthServerSessionID, ok := s.authCode2SessionID[code]
+	if !ok {
+		zlog.LogWarn("cannot find the corresponding sessionID for code")
+		return
+	}
+	delete(s.authCode2SessionID, code)
+
+	if _, ok = s.oauthProxyStore[oauthServerSessionID]; !ok {
+		s.oauthProxyStore[oauthServerSessionID] = make(map[string]string)
+	}
+	s.oauthProxyStore[oauthServerSessionID][sessionID] = proxyLogoutEndpoint
 	return
 }
 
@@ -280,7 +336,7 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
 	extras, ok4 := cookieData.GetExtras(constants.UserExtra)
 
 	// if it is the first login
-	if ok4 && extras["first-login"][0] == "true" {
+	if ok4 && extras[constants.UserFirstLogin][0] == "true" {
 		return nil, constants.FirstLogin, nil
 	}
 
@@ -329,6 +385,61 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 	return nil
 }
 
+// SingleLogoutHandler receives requests from console-service logout request and dispatch it to
+// all registered oauth-proxies
+func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *http.Request) {
+	// fetch the idpLogin sessionID
+	cookieData := s.idpLoginStore.Get(r)
+	sessionArray, ok := cookieData.GetExtraByKey(constants.OAuthServerSessionID)
+	if !ok {
+		zlog.LogWarn("the oauth-server cookie does not contain web-oauthserver sessionid")
+		// flush the loginState
+		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+		}
+		http.Redirect(w, r, "/auth/login/fuyaoPasswordProvider", http.StatusFound)
+		return
+	}
+	oauthServerSessionID := sessionArray[0]
+
+	// dispatch one by one
+	for sessionID, proxyEndpoint := range s.oauthProxyStore[oauthServerSessionID] {
+		// 创建请求 URL
+		url := fmt.Sprintf("%s?%s=%s", proxyEndpoint, constants.SessionIDParam, sessionID)
+
+		// 创建 POST 请求
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte{}))
+		if err != nil {
+			zlog.LogErrorf("Failed to create request: %v", err)
+		}
+
+		// 设置请求头，如果需要其他头部信息，可以在这里添加
+		req.Header.Set("Content-Type", "application/json")
+
+		// 发送请求
+		client := http.DefaultClient
+		transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		client.Transport = transport
+		resp, err := client.Do(req)
+		if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
+			zlog.LogErrorf("Failed to dispatch logout requests to oauth-proxies, err: %v", err)
+		}
+	}
+
+	// flush the loginState
+	if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	delete(s.oauthProxyStore, oauthServerSessionID)
+
+	// redirect to login
+	// [TO-DO]: redirect to console-service mainpage
+	http.Redirect(w, r, "/auth/login/fuyaoPasswordProvider", http.StatusFound)
+}
+
+// belows are private functions
 func (s *FuyaoAuthorizeServer) wrapReturnErrorHandler(w http.ResponseWriter, err error) {
 	if err != nil {
 		zlog.LogErrorf("fail when writing error back to the http response header, err: %v", err)

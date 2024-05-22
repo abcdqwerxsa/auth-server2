@@ -171,7 +171,7 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 	if err != nil {
 		return nil, "", err
 	}
-	firstLoginField, ok := extra["first-login"]
+	firstLoginField, ok := extra[constants.UserFirstLogin]
 	if !ok {
 		return nil, "", fuyaoerrors.ErrLoginServiceDown
 	}
@@ -180,7 +180,7 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 		return nil, "", fuyaoerrors.ErrLoginServiceDown
 	}
 	userinfo.Extra = make(map[string][]string)
-	userinfo.Extra["first-login"] = []string{firstLogin}
+	userinfo.Extra[constants.UserFirstLogin] = []string{firstLogin}
 
 	return &userinfo, base64EncryptedPassword, nil
 }
@@ -225,7 +225,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, passwd string, first
 	if err != nil {
 		return err
 	}
-	firstLoginField, ok := extra["first-login"]
+	firstLoginField, ok := extra[constants.UserFirstLogin]
 	if !ok {
 		return fuyaoerrors.ErrLoginServiceDown
 	}
@@ -243,7 +243,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, passwd string, first
 
 	// set new password
 	secret.Data["encrypted-password"] = []byte(encryptedPassword)
-	extra["first-login"][0] = "false"
+	extra[constants.UserFirstLogin][0] = "false"
 	byteExtra, err := json.Marshal(extra)
 	if err != nil {
 		zlog.LogErrorf("fail to marshal extra bytes, err: %v", err)

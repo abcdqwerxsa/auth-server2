@@ -22,7 +22,7 @@ spec:
           operator: "Exists"
       containers:
         - name: oauth-server
-          image: localhost:5000/oauth-server:upload
+          image: piamposer/oauth-server:latest
           imagePullPolicy: Always
           ports:
             - name: https

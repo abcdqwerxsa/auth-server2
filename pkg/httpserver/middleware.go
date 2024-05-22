@@ -46,7 +46,13 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 
 		// add cors header
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		// Create a new responseLogger
 		rl := &responseLogger{
@@ -54,8 +60,13 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 			status:         http.StatusOK, // Default status code is 200
 		}
 
-		// Execute the next handler
-		next.ServeHTTP(rl, r)
+		// respond to the initial option request
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			// Execute the next handler
+			next.ServeHTTP(rl, r)
+		}
 
 		// Log access
 		logFunc := zlog.LogInfof

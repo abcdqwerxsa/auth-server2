@@ -103,31 +103,6 @@ func (s *K8sSecretStore) createByAccess(ctx context.Context, info oauth2.TokenIn
 		zlog.LogWarn("the oauth access-token expiration time is not set")
 	}
 
-	// serialize the info
-	data, err := json.Marshal(info)
-	if err != nil {
-		return err
-	}
-
-	// save the info to secret
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			// FUTURE FIX: secret only allows lowercase letters, whether there are conflicts if simply lowercasing them
-			Name:      refactorSecretName(constants.AccessPrefix + info.GetAccess()),
-			Namespace: s.ns,
-		},
-		Data: map[string][]byte{
-			"userinfo": data,
-		},
-	}
-
-	// create the secret
-	_, err = s.k8sClient.CoreV1().Secrets(s.ns).Create(ctx, secret, metav1.CreateOptions{})
-	if err != nil {
-		zlog.LogErrorf("cannot create access-token secret %s, err: %v", info.GetAccess(), err)
-		return fuyaoerrors.ErrFailToCreateSecret
-	}
-
 	return nil
 }
 
