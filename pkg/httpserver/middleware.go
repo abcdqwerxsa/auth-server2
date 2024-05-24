@@ -1,0 +1,90 @@
+/*
+ * Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * openFuyao is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ */
+
+// Package httpserver defines the httpserver options and middlewares
+package httpserver
+
+import (
+	"net/http"
+	"time"
+
+	"openfuyao/oauth-server/pkg/zlog"
+)
+
+// responseLogger is a custom response logger for recording response status codes and sizes
+type responseLogger struct {
+	http.ResponseWriter
+	status int
+	size   int
+}
+
+// WriteHeader rewrites the WriteHeader method of http.ResponseWriter
+func (rl *responseLogger) WriteHeader(code int) {
+	rl.status = code
+	rl.ResponseWriter.WriteHeader(code)
+}
+
+// Write rewrites the Write method of http.ResponseWriter
+func (rl *responseLogger) Write(b []byte) (int, error) {
+	size, err := rl.ResponseWriter.Write(b)
+	rl.size += size
+	return size, err
+}
+
+// AccessLoggingMiddleware logs the access entries
+func AccessLoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		// add cors header
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		// Create a new responseLogger
+		rl := &responseLogger{
+			ResponseWriter: w,
+			status:         http.StatusOK, // Default status code is 200
+		}
+
+		// respond to the initial option request
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			// Execute the next handler
+			next.ServeHTTP(rl, r)
+		}
+
+		// Log access
+		logFunc := zlog.LogInfof
+		if rl.status >= http.StatusBadRequest {
+			logFunc = zlog.LogWarnf
+		}
+		logFunc(
+			`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
+			r.RemoteAddr,
+			start.Format("02/Jan/2006:15:04:05 -0700"),
+			time.Since(start).Milliseconds(),
+			r.Method,
+			r.RequestURI,
+			r.Proto,
+			rl.status,
+			rl.size,
+			r.Header.Get("Referer"),
+			r.UserAgent(),
+		)
+	})
+}
