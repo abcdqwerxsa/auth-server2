@@ -388,7 +388,15 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 // SingleLogoutHandler receives requests from console-service logout request and dispatch it to
 // all registered oauth-proxies
 func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// fetch the idpLogin sessionID
+	if r.Method != http.MethodPost {
+		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+	// fetch the redirect_uri and idpLogin sessionID
+	redirectURI := r.URL.Query().Get(constants.LogoutRedirectURI)
+	if redirectURI == "" {
+		redirectURI = constants.FuyaoLoginEndpoint
+	}
 	cookieData := s.idpLoginStore.Get(r)
 	sessionArray, ok := cookieData.GetExtraByKey(constants.OAuthServerSessionID)
 	if !ok {
@@ -397,7 +405,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
 			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
 		}
-		http.Redirect(w, r, "/auth/login/fuyaoPasswordProvider", http.StatusFound)
+		http.Redirect(w, r, constants.FuyaoLoginEndpoint, http.StatusFound)
 		return
 	}
 	oauthServerSessionID := sessionArray[0]
@@ -436,7 +444,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 
 	// redirect to login
 	// [TO-DO]: redirect to console-service mainpage
-	http.Redirect(w, r, "/auth/login/fuyaoPasswordProvider", http.StatusFound)
+	http.Redirect(w, r, redirectURI, http.StatusFound)
 }
 
 // belows are private functions

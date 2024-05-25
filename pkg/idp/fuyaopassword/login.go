@@ -279,7 +279,7 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/auth/login/fuyaoPasswordProvider", http.StatusFound)
+	http.Redirect(w, r, constants.FuyaoLoginEndpoint, http.StatusFound)
 }
 
 func (l *Login) getAccessToken(r *http.Request) (string, error) {
