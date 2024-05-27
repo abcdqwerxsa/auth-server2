@@ -109,29 +109,6 @@ func (l *Login) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// LogoutHandler Deprecated! in openFuyao fuyaoPasswordProvider delete the loginState
-func (l *Login) LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// check logged in status
-	accessToken, err := l.getAccessToken(r)
-	if err != nil {
-		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusBadRequest)
-		return
-	}
-	loggedIn, err := l.authenticateByWebhook(accessToken)
-	if !loggedIn || err != nil {
-		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
-	}
-
-	// flush the loginState
-	if err = l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	return
-}
-
 // PasswordConfirmHandler works when the user login for the first time
 func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {

@@ -17,8 +17,8 @@ const (
 	RootPrefix                   = "/oauth2"
 	FuyaoLoginEndpoint           = RootPrefix + "/auth/login/" + FuyaoIdpProvider
 	FuyaoLogoutEndpoint          = RootPrefix + "/auth/logout/" + FuyaoIdpProvider
-	FuyaoPasswordModifyEndpoint  = RootPrefix + "/auth/password/confirm/" + FuyaoIdpProvider
-	FuyaoPasswordConfirmEndpoint = RootPrefix + "/auth/password/modify/" + FuyaoIdpProvider
+	FuyaoPasswordModifyEndpoint  = RootPrefix + "/auth/password/modify/" + FuyaoIdpProvider
+	FuyaoPasswordConfirmEndpoint = RootPrefix + "/auth/password/confirm/" + FuyaoIdpProvider
 	FuyaoOAuthAuthorizeEndpoint  = RootPrefix + "/oauth/authorize"
 	FuyaoOAuthTokenEndpoint      = RootPrefix + "/oauth/token"
 )

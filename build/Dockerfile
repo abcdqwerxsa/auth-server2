@@ -10,8 +10,8 @@
 
 # syntax=docker/dockerfile:latest
 
-ARG GO_VERSION=1.21
-ARG GO_IMAGE=golang:${GO_VERSION}
+ARG GO_VERSION=1.21.8
+ARG GO_IMAGE=harbor.openfuyao.com/openfuyao/golang:${GO_VERSION}
 
 # stage 1: build
 FROM ${GO_IMAGE} AS build
@@ -27,6 +27,11 @@ COPY . .
 ARG GOPROXY=https://goproxy.io,direct
 ARG CGO_ENABLED=1
 ARG GOFLAGS='-buildvcs=false -buildmode=pie -tags=osusergo,netgo "-ldflags=-w -s -linkmode=external '"'"'-extldflags=-Wl,-z,now -static-pie'"'"'"'
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV GOOS=${TARGETOS}
+ENV GOARCH=${TARGETARCH}
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     go build -o /go/bin/app ${PKG}

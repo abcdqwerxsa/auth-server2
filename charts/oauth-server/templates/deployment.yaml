@@ -22,11 +22,12 @@ spec:
           operator: "Exists"
       containers:
         - name: oauth-server
-          image: piamposer/oauth-server:latest
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          # image: {{ .Values.config.image | default "harbor.openfuyao.com/openfuyao/oauth-server:latest" }}
           imagePullPolicy: Always
           ports:
             - name: https
-              containerPort: 9096
+              containerPort: {{ .Values.config.httpServerConfig.port }}
           args:
             - --configFile=config.json
           volumeMounts:

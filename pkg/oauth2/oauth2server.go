@@ -405,7 +405,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
 			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
 		}
-		http.Redirect(w, r, constants.FuyaoLoginEndpoint, http.StatusFound)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	oauthServerSessionID := sessionArray[0]
@@ -425,7 +425,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		req.Header.Set("Content-Type", "application/json")
 
 		// 发送请求
-		client := http.DefaultClient
+		client := &http.Client{}
 		transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 		client.Transport = transport
 		resp, err := client.Do(req)
@@ -442,9 +442,8 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 	}
 	delete(s.oauthProxyStore, oauthServerSessionID)
 
-	// redirect to login
-	// [TO-DO]: redirect to console-service mainpage
-	http.Redirect(w, r, redirectURI, http.StatusFound)
+	// no content to return
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // belows are private functions
