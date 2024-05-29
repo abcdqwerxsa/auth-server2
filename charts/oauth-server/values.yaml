@@ -1,0 +1,30 @@
+# Default values for oauth-server.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+config:
+  httpServerConfig:
+    port: 9096
+
+  loginSessionConfig:
+    maxSeconds: 600
+    signingKey: "auth"
+    encryptionKey: "encrypt123123123"
+
+  ipProtectorConfig:
+    failTimes: "5"
+    failDuration: "5m"
+    lockDuration: "20m"
+
+  oauthServerConfig:
+    authCodeExp: "5m"
+    accessTokenExp: "2h"
+    clientSecret:
+      console: "console-password"
+      oauthProxy: "SECRETTS"
+
+image:
+  repository: "harbor.openfuyao.com/openfuyao/oauth-server"
+  tag: "latest"
+  digest: "276b803df5285ccc3af34ec158d0d5f34485685982df223b41c2df38fcf54887"
+  # image: "harbor.openfuyao.com/openfuyao/oauth-server:latest"

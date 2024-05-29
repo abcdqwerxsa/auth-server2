@@ -27,6 +27,7 @@ const (
 	SessionIDParam      = "session_id"
 	LogoutEndpointParam = "logout_endpoint"
 	CodeParam           = "code"
+	LogoutRedirectURI   = "redirect_uri"
 )
 
 // FuyaoIdpProvider Constants for identity provider
@@ -60,8 +61,8 @@ const (
 
 // Constants for url redirect templates
 const (
-	LoginRedirectTemplate           = "/auth/login/%s"
-	PasswordConfirmRedirectTemplate = "/auth/password/confirm/%s"
+	LoginRedirectTemplate           = RootPrefix + "/auth/login/%s"
+	PasswordConfirmRedirectTemplate = RootPrefix + "/auth/password/confirm/%s"
 )
 
 // Constants for url form templates

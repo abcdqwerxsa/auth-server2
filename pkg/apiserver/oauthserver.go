@@ -21,6 +21,7 @@ import (
 
 	overallconfigs "openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/config"
+	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaostore"
 	"openfuyao/oauth-server/pkg/httpserver"
 	"openfuyao/oauth-server/pkg/idp/fuyaopassword"
@@ -72,12 +73,12 @@ func NewOAuthServerAPIServer(
 // PrepareRun registers the router and the access logger
 func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
-	s.Router.HandleFunc("/auth/login/fuyaoPasswordProvider", s.Login.LoginHandler)
-	s.Router.HandleFunc("/auth/logout/fuyaoPasswordProvider", s.OAuthServer.SingleLogoutHandler)
-	s.Router.HandleFunc("/auth/password/confirm/fuyaoPasswordProvider", s.Login.PasswordConfirmHandler)
-	s.Router.HandleFunc("/auth/password/modify/fuyaoPasswordProvider", s.Login.PasswordResetHandler)
-	s.Router.HandleFunc("/oauth/authorize", s.OAuthServer.OAuthAuthorizeHandler)
-	s.Router.HandleFunc("/oauth/token", s.OAuthServer.OAuthTokenHandler)
+	s.Router.HandleFunc(constants.FuyaoLoginEndpoint, s.Login.LoginHandler)
+	s.Router.HandleFunc(constants.FuyaoLogoutEndpoint, s.OAuthServer.SingleLogoutHandler)
+	s.Router.HandleFunc(constants.FuyaoPasswordConfirmEndpoint, s.Login.PasswordConfirmHandler)
+	s.Router.HandleFunc(constants.FuyaoPasswordModifyEndpoint, s.Login.PasswordResetHandler)
+	s.Router.HandleFunc(constants.FuyaoOAuthAuthorizeEndpoint, s.OAuthServer.OAuthAuthorizeHandler)
+	s.Router.HandleFunc(constants.FuyaoOAuthTokenEndpoint, s.OAuthServer.OAuthTokenHandler)
 	return nil
 }
 
