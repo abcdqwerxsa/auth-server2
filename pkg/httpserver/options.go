@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
-// Package httpserver defines the httpserver options and middlewares
+// Package httpserver defines the httpserver options, middlewares and responses
 package httpserver
 
 import (

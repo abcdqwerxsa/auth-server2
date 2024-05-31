@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"openfuyao/oauth-server/pkg/httpserver"
 	"strconv"
 	"strings"
 	"text/template"
@@ -161,17 +162,12 @@ func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request
 }
 
 func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
-	// check http method
-	if r.Method != http.MethodPost {
-		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
-		return
-	}
-
 	// read userinfo from session-store
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
 	if !ok {
-		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusUnauthorized)
+		// TODO: directly redirect to console-service mainpage
+		http.Redirect(w, r, "http://192.168.100.48:30023", http.StatusFound)
 		return
 	}
 
@@ -192,15 +188,12 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// set first-login to false in the oauth-session
+	// TODO: if fail between l-193 and l-198, only idpLogin cookie first-login is tainted, we can still redirect safely
 	ok = loginData.SetLoggedIn()
 	if !ok {
 		zlog.LogError("fail to set first-login state to false, probably due to web modification")
-		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
-		return
 	} else if err := l.idpLoginStore.Put(w, loginData); err != nil {
 		zlog.LogError("fail to store loginState to session")
-		http.Error(w, fuyaoerrors.ErrStrLoginServiceDown, http.StatusInternalServerError)
-		return
 	}
 	zlog.LogInfof("Password Confirmation succeed for user: %s", username)
 
@@ -212,26 +205,26 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	// check http method
 	if r.Method != http.MethodPost {
-		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
+		httpserver.RespondWithStatusMsg(w, http.StatusMethodNotAllowed, 0, fuyaoerrors.ErrStrRequestMethodNotAllowed)
 		return
 	}
 
 	// add an access token validation, since all the services are required to expose in this version
 	accessToken, err := l.getAccessToken(r)
 	if err != nil {
-		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusBadRequest)
+		httpserver.RespondWithStatusMsg(w, http.StatusUnauthorized, 0, fuyaoerrors.ErrStrNotLogin)
 		return
 	}
 
 	loggedIn, err := l.authenticateByWebhook(accessToken)
 	if !loggedIn || err != nil {
-		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
 	}
 
 	// read params from r.url
 	var requestBody PasswordResetRequest
 	if err = json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
-		http.Error(w, fuyaoerrors.ErrStrFailToUnmarshalData, http.StatusBadRequest)
+		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
 		return
 	}
 
@@ -239,24 +232,18 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	oldPassword := requestBody.OriginalPassword
 	newPassword := requestBody.NewPassword
 	if len(username) == 0 || len(oldPassword) == 0 || len(newPassword) == 0 {
-		http.Error(w, fuyaoerrors.ErrStrUsernameOrPasswordMissing, http.StatusBadRequest)
+		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrUsernameOrPasswordMissing)
 		return
 	}
 
 	if err := l.Authenticator.ResetPassword(context.Background(), username, oldPassword, newPassword); err != nil {
-		http.Error(w, err.Error(), fuyaoerrors.ErrStatusCode[err])
+		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
 		return
 	}
 	zlog.LogInfof("Password Reset succeed for user: %s", username)
 
-	// flush the loginState
-	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	http.Redirect(w, r, constants.FuyaoLoginEndpoint, http.StatusFound)
+	httpserver.RespondWithStatusMsg(w, http.StatusOK, 0, "Password Reset OK")
+	return
 }
 
 func (l *Login) getAccessToken(r *http.Request) (string, error) {
