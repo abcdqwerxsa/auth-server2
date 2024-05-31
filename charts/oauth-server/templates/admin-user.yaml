@@ -1,12 +1,11 @@
 apiVersion: v1
+data:
+  encrypted-password: M1hLaVMrNnhoc3pNVXQxNUsrK1ZFdTF1N2dydUFQSnFMbTMxUi92L3htRm05eThDN1kwZFoyTWwzTmsyRlVYR1A4N3dUL1Z1dmtjeGp5cjVob0hHeXJCeGhISGJ0aFUvY29yWUlPU0pnT3M9
+  extra: eyJmaXJzdC1sb2dpbiI6WyJ0cnVlIl19
+  groups: c3lzdGVtOmFkbWlu
+  username: YWRtaW4=
 kind: Secret
 metadata:
   name: admin
   namespace: oauth-user
 type: Opaque
-data:
-  # encrypted-password 对应的 password 是 soup4@LL
-  encrypted-password: cHlOa25HRzVVU01PL202T1Ywbnh1cFVqdVZNYURNQVlNeHRSUllnVkZ1eEdUWnlJbFFMaXY0SEk4Um5rVmZNa2FFaVBtbTZYSjhpR0dLOGZqTDgxMFZEcnlUYVlpeW43WWZ6RmN0SlRzSDA9
-  extra: eyJmaXJzdC1sb2dpbiI6WyJmYWxzZSJdfQ==
-  groups: c3lzdGVtOmFkbWlu
-  username: YWRtaW4=

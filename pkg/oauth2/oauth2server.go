@@ -22,6 +22,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"openfuyao/oauth-server/pkg/httpserver"
 	"strings"
 	"time"
 
@@ -63,6 +64,8 @@ type FuyaoAuthorizeServer struct {
 	oauthProxyStore map[string]map[string]string
 	// authCode2SessionID maps each auth-code to the central sessionID
 	authCode2SessionID map[string]string
+	// consoleServiceHost defines the console-service service host
+	consoleServiceHost string
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer
@@ -182,7 +185,8 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 	if req.RedirectURI == "" {
 		client, err := s.Manager.GetClient(ctx, req.ClientID)
 		if err != nil {
-			s.wrapReturnErrorHandler(w, err)
+			s.redirectAuthorizationCodeError(w, req, err)
+			return
 		}
 		req.RedirectURI = client.GetDomain()
 	}
@@ -389,7 +393,7 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 // all registered oauth-proxies
 func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
+		httpserver.RespondWithStatusMsg(w, http.StatusMethodNotAllowed, 0, fuyaoerrors.ErrStrRequestMethodNotAllowed)
 		return
 	}
 	// fetch the redirect_uri and idpLogin sessionID
@@ -405,7 +409,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
 			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
 		}
-		w.WriteHeader(http.StatusUnauthorized)
+		httpserver.RespondWithStatusMsg(w, http.StatusUnauthorized, 0, "missing oauth-sessionid")
 		return
 	}
 	oauthServerSessionID := sessionArray[0]
@@ -437,13 +441,14 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 	// flush the loginState
 	if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
 		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpserver.RespondWithStatusMsg(w, http.StatusInternalServerError, 0, err.Error())
 		return
 	}
 	delete(s.oauthProxyStore, oauthServerSessionID)
 
 	// no content to return
-	w.WriteHeader(http.StatusNoContent)
+	httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
+	return
 }
 
 // belows are private functions
@@ -514,7 +519,6 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
 		zlog.LogErrorf("%s, err: %s", fuyaoerrors.ErrStrFailToMarshalData, err)
-		http.Error(w, fuyaoerrors.ErrStrFailToMarshalData, fuyaoerrors.ErrStatusCode[fuyaoerrors.ErrFailToMarshalData])
 	}
 
 	return

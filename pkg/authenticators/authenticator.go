@@ -19,7 +19,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"hash"
 	"regexp"
 	"strings"
@@ -104,7 +103,7 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, passwd st
 	}
 
 	// check whether the password is contained in username / reversed username
-	if strings.Contains(passwd, username) || strings.Contains(passwd, reverseString(username)) {
+	if passwd == username || passwd == reverseString(username) {
 		zlog.LogError("password cannot be the same as the account number or the reverse account number")
 		return false
 	}
@@ -311,14 +310,14 @@ func (a *FuyaoPasswordAuthenticator) ResetPassword(
 	if ok, err := a.encryptor.VerifyPassword(oldPassword, base64EncryptedOldPassword); !ok || err != nil {
 		if err == nil {
 			zlog.LogError("password verification failed")
-			return fuyaoerrors.ErrPasswordAuthenticationFailed
+			return fuyaoerrors.ErrPasswordResetFailed
 		}
 		return err
 	}
 
 	// 校验 password 复杂度
 	if ok := a.checkPasswordComplexity(username, newPassword); !ok {
-		return errors.New(fuyaoerrors.ErrStrPasswordTooWeak)
+		return fuyaoerrors.ErrPasswordTooWeak
 	}
 
 	// 存储新密码

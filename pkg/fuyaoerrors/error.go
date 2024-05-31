@@ -37,6 +37,10 @@ const (
 	// username or password during authentication.
 	ErrStrPasswordAuthenticationFailed = "用户名或密码错误"
 
+	// ErrStrPasswordResetFailed represents an internal runtime error indicating incorrect
+	// username or password during authentication.
+	ErrStrPasswordResetFailed = "当前密码错误"
+
 	// ErrStrPasswordAuthenticationFailedWithCount represents an internal runtime error indicating incorrect
 	// username or password during authentication, and will also return the remaining attempt counts
 	ErrStrPasswordAuthenticationFailedWithCount = "用户名或密码错误，再输错 %s 次用户将锁定"
@@ -148,6 +152,9 @@ const (
 
 	// ErrStrRedirectURIMissing represents the redirect uri is missing
 	ErrStrRedirectURIMissing = "the redirect uri is missing or incomplete"
+
+	// ErrStrConsoleServiceHostMissing represents the console-service host is missing
+	ErrStrConsoleServiceHostMissing = "the console-service host is missing or incomplete"
 )
 
 var (
@@ -168,6 +175,10 @@ var (
 	// ErrPasswordAuthenticationFailed represents an internal runtime error indicating incorrect username or
 	// password during authentication.
 	ErrPasswordAuthenticationFailed = errors.New(ErrStrPasswordAuthenticationFailed)
+
+	// ErrPasswordResetFailed represents an internal runtime error indicating incorrect username or
+	// password during authentication.
+	ErrPasswordResetFailed = errors.New(ErrStrPasswordResetFailed)
 
 	// ErrPasswordSame represents an internal runtime error indicating that the new password is the same as
 	// the original password.
@@ -279,6 +290,9 @@ var (
 
 	// ErrRedirectURIMissing represents the redirect uri is missing
 	ErrRedirectURIMissing = errors.New(ErrStrRedirectURIMissing)
+
+	// ErrConsoleServiceHostMissing represents the console-service host is missing
+	ErrConsoleServiceHostMissing = errors.New(ErrStrConsoleServiceHostMissing)
 )
 
 // ErrStatusCode is the mapper from error to http return error
@@ -288,6 +302,7 @@ var ErrStatusCode = map[error]int{
 	ErrFailToParseForm:              http.StatusInternalServerError,
 	ErrLoginServiceDown:             http.StatusInternalServerError,
 	ErrPasswordAuthenticationFailed: http.StatusUnauthorized,
+	ErrPasswordResetFailed:          http.StatusUnauthorized,
 	ErrPasswordSame:                 http.StatusUnauthorized,
 	ErrPasswordTooWeak:              http.StatusBadRequest,
 	ErrIdentityProviderIncorrect:    http.StatusBadRequest,

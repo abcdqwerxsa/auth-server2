@@ -24,7 +24,7 @@ import (
 type failedLoginTracker struct {
 	locked   bool
 	lockTime time.Time
-	queue    list.List
+	queue    *list.List
 }
 
 // LoginIPProtector is the structure for IPProtector
@@ -73,6 +73,7 @@ func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) int {
 func (p *LoginIPProtector) Unlock(ip string) {
 	p.ipProtector[ip].locked = false
 	p.ipProtector[ip].lockTime = time.Time{}
+	p.ipProtector[ip].queue = list.New()
 }
 
 // CheckLocked checks whether ip is locked and return the remaining locked time if it's locked
@@ -110,6 +111,6 @@ func (p *LoginIPProtector) squeezeTracker(ip string) {
 func (p *LoginIPProtector) ensureExistence(ip string) {
 	_, ok := p.ipProtector[ip]
 	if !ok {
-		p.ipProtector[ip] = &failedLoginTracker{locked: false}
+		p.ipProtector[ip] = &failedLoginTracker{locked: false, queue: list.New()}
 	}
 }
