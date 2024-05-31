@@ -64,6 +64,8 @@ type FuyaoAuthorizeServer struct {
 	oauthProxyStore map[string]map[string]string
 	// authCode2SessionID maps each auth-code to the central sessionID
 	authCode2SessionID map[string]string
+	// consoleServiceHost defines the console-service service host
+	consoleServiceHost string
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer

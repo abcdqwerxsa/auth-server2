@@ -111,6 +111,6 @@ func (p *LoginIPProtector) squeezeTracker(ip string) {
 func (p *LoginIPProtector) ensureExistence(ip string) {
 	_, ok := p.ipProtector[ip]
 	if !ok {
-		p.ipProtector[ip] = &failedLoginTracker{locked: false}
+		p.ipProtector[ip] = &failedLoginTracker{locked: false, queue: list.New()}
 	}
 }

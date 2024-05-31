@@ -22,7 +22,6 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"openfuyao/oauth-server/pkg/httpserver"
 	"strconv"
 	"strings"
 	"text/template"
@@ -39,6 +38,7 @@ import (
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/fuyaostore"
+	"openfuyao/oauth-server/pkg/httpserver"
 	"openfuyao/oauth-server/pkg/idp"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
@@ -71,11 +71,12 @@ func (l *LoginForm) OutputHTML(w http.ResponseWriter, tpl string, name string) {
 type Login struct {
 	Provider string
 	// CSRF csrf.CSRF
-	K8sClient        kubernetes.Interface
-	TokenStore       *fuyaostore.K8sSecretStore
-	Authenticator    authenticators.PasswordAuthenticator
-	idpLoginStore    *sessions.CookieStore
-	loginIPProtector *protector.LoginIPProtector
+	consoleServiceHost string
+	K8sClient          kubernetes.Interface
+	TokenStore         *fuyaostore.K8sSecretStore
+	Authenticator      authenticators.PasswordAuthenticator
+	idpLoginStore      *sessions.CookieStore
+	loginIPProtector   *protector.LoginIPProtector
 }
 
 // NewLogin returns the fuyao Login instance
@@ -87,12 +88,13 @@ func NewLogin(
 	loginConfig *config.LoginConfig,
 ) *Login {
 	return &Login{
-		Provider:         loginConfig.Provider,
-		K8sClient:        k8sClient,
-		TokenStore:       tokenStore,
-		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, loginConfig.UserNamespace),
-		idpLoginStore:    idpLoginStore,
-		loginIPProtector: loginIPProtector,
+		Provider:           loginConfig.Provider,
+		consoleServiceHost: loginConfig.ConsoleServiceHost,
+		K8sClient:          k8sClient,
+		TokenStore:         tokenStore,
+		Authenticator:      authenticators.NewFuyaoPasswordAuthenticator(k8sClient, loginConfig.UserNamespace),
+		idpLoginStore:      idpLoginStore,
+		loginIPProtector:   loginIPProtector,
 	}
 }
 
@@ -166,8 +168,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
 	if !ok {
-		// TODO: directly redirect to console-service mainpage
-		http.Redirect(w, r, "http://192.168.100.48:30023", http.StatusFound)
+		http.Redirect(w, r, l.consoleServiceHost, http.StatusFound)
 		return
 	}
 
@@ -188,12 +189,14 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// set first-login to false in the oauth-session
-	// TODO: if fail between l-193 and l-198, only idpLogin cookie first-login is tainted, we can still redirect safely
+	// if fail in the following 8 lines only idpLogin cookie first-login is tainted, we can still redirect safely
 	ok = loginData.SetLoggedIn()
 	if !ok {
 		zlog.LogError("fail to set first-login state to false, probably due to web modification")
 	} else if err := l.idpLoginStore.Put(w, loginData); err != nil {
 		zlog.LogError("fail to store loginState to session")
+	} else {
+		zlog.LogInfo("Successfully set idpLogin state for password confirmation.")
 	}
 	zlog.LogInfof("Password Confirmation succeed for user: %s", username)
 

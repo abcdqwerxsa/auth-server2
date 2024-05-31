@@ -310,7 +310,7 @@ func (a *FuyaoPasswordAuthenticator) ResetPassword(
 	if ok, err := a.encryptor.VerifyPassword(oldPassword, base64EncryptedOldPassword); !ok || err != nil {
 		if err == nil {
 			zlog.LogError("password verification failed")
-			return fuyaoerrors.ErrPasswordAuthenticationFailed
+			return fuyaoerrors.ErrPasswordResetFailed
 		}
 		return err
 	}

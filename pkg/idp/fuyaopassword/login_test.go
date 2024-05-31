@@ -15,24 +15,26 @@ package fuyaopassword
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
+
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/authenticators"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaostore"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
-	"strings"
-	"testing"
-	"time"
 )
 
 // TestLoginHandlerGetSucceed tests the successful condition for getting login page
@@ -218,7 +220,7 @@ func TestLoginHandlerPostSucceed(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	testUserSecret := &v1.Secret{
+	testUserSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "admin",
 			Namespace: "oauth-user",
@@ -603,7 +605,7 @@ func TestLoginPasswordConfirmHandlerPostSucceed(t *testing.T) {
 	}
 	req.AddCookie(fakeCookie)
 
-	testUserSecret := &v1.Secret{
+	testUserSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "admin",
 			Namespace: "oauth-user",
@@ -673,7 +675,7 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+bearerToken)
 
 	// add fake secrets
-	testUserSecret := &v1.Secret{
+	testUserSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "admin",
 			Namespace: "oauth-user",

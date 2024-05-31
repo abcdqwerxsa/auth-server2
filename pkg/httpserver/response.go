@@ -16,6 +16,8 @@ package httpserver
 import (
 	"encoding/json"
 	"net/http"
+
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 // HttpResponse defines the http response struct
@@ -35,6 +37,8 @@ func RespondWithStatusMsg(w http.ResponseWriter, statusCode int, errCode int32, 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(errResponse)
+	if err := json.NewEncoder(w).Encode(errResponse); err != nil {
+		zlog.LogErrorf("failed to encode json, err: %v", err)
+	}
 	return
 }
