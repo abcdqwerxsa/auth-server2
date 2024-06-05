@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oauth-server-ingress
+  namespace: fuyao-oauth
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: '/oauth2'
+            pathType: Prefix
+            backend:
+              service:
+                name: oauth-server
+                port:
+                  number: {{ .Values.config.httpServerConfig.port }}
+  ingressClassName: nginx

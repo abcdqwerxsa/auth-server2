@@ -294,6 +294,14 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 		then = "/"
 	}
 
+	// redirect if already logged in
+	loginData := l.idpLoginStore.Get(r)
+	_, ok := loginData.GetString(constants.UserName)
+	if ok {
+		http.Redirect(w, r, then, http.StatusFound)
+		return
+	}
+
 	// get error from r
 	errString := r.URL.Query().Get(constants.ErrorParam)
 
