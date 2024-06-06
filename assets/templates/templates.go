@@ -152,7 +152,7 @@ const (
 		`76.5-12.7h46.9c10.2019.94.925.913.3l71.298.8157.2-218c6-8.315.6-13.325.9-13.3H699c6.5010.37.46.512.` +
 		`7z'%3E%3C/path%3E%3C/svg%3E")}
         .prompt-default.prompt-ok::before{background-image:url("data:image/svg+xml,%3Csvgxmlns='http://www.w3.` +
-		`org/2000/svg'viewBox='6464896896'fill='%23009aa71'%3E%3Cpathd='M51264C264.66464264.664512s200.` +
+		`org/2000/svg'viewBox='6464896896'fill='%2309aa71'%3E%3Cpathd='M51264C264.66464264.664512s200.` +
 		`6448448448448-200.6448-448S759.46451264zm193.5301.7l-210.6292a31.831.8001-51.70L318.5484.9c-3.8-5.30-12.` +
 		`76.5-12.7h46.9c10.2019.94.925.913.3l71.298.8157.2-218c6-8.315.6-13.325.9-13.3H699c6.5010.37.46.512.` +
 		`7z'%3E%3C/path%3E%3C/svg%3E")}
@@ -295,6 +295,7 @@ const (
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden></div>
                 <div class="prompt-line prompt-default prompt-error">两次输入密码需要一致</div>
                 <div class="btn-block">
+					<button class="cancel-btn" type="button"><span>取消</span></button>
                     <button id="confirm-btn" type="submit" class="btn-primary confirm-btn"
                         formnovalidate><span>确认</span></button>
                 </div>
@@ -383,6 +384,37 @@ const (
                 event.preventDefault()
             }
         })
+		
+		document.addEventListener('DOMContentLoaded', function () {
+            const cancelButton = document.querySelector('.cancel-btn');
+
+            cancelButton.addEventListener('click', function () {
+                sendDeleteRequest('{{.Action}}');
+            });
+        });
+
+        function sendDeleteRequest(url) {
+            fetch(url, {
+                method: 'DELETE',
+                credentials: 'include' // 传递 cookies
+            })
+            .then(response => {
+                if (response.ok) {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    } else {
+                        alert('首次修改密码成功');
+                    }
+                } else {
+                    // 请求失败后的操作
+                    alert('首次修改密码取消失败');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('请求出错');
+            });
+        }
     </script>
     <style>
         body,html{margin:0;padding:0;font-size:14px;font-family:'Montserrat',sans-serif;box-sizing:border-box}
@@ -407,7 +439,7 @@ const (
 		` 301.7l-210.6 292a31.8 31.8 0 01-51.7 0L318.5 484.9c-3.8-5.3 0-12.7 6.5-12.7h46.9c10.2 0 19.9 4.9 25.9` +
 		` 13.3l71.2 98.8 157.2-218c6-8.3 15.6-13.3 25.9-13.3H699c6.5 0 10.3 7.4 6.5 12.7z'%3E%3C/path%3E%3C/svg%3E")}
         .prompt-default.prompt-ok::before{background-image:url("data:image/svg+xml,%3Csvg ` +
-		`xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23009aa71'%3E%3Cpath d='M512 64C264.6` +
+		`xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%2309aa71'%3E%3Cpath d='M512 64C264.6` +
 		` 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm193.5 301.7l-210.6 292a31.8 31.8` +
 		` 0 01-51.7 0L318.5 484.9c-3.8-5.3 0-12.7 6.5-12.7h46.9c10.2 0 19.9 4.9 25.9 13.3l71.2 98.8 157.2-218c6-8.3` +
 		` 15.6-13.3 25.9-13.3H699c6.5 0 10.3 7.4 6.5 12.7z'%3E%3C/path%3E%3C/svg%3E")}

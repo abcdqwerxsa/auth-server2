@@ -120,6 +120,8 @@ func (l *Login) PasswordConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == http.MethodPost {
 		// deal with POST
 		l.processPasswordConfirm(w, r)
+	} else if r.Method == http.MethodDelete {
+		l.revertPasswordConfirm(w, r)
 	} else {
 		http.Error(w, fuyaoerrors.ErrStrRequestMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
@@ -168,7 +170,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
 	if !ok {
-		http.Redirect(w, r, l.consoleServiceHost, http.StatusFound)
+		http.Redirect(w, r, getConsoleServiceHost(r), http.StatusFound)
 		return
 	}
 
@@ -202,6 +204,27 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 
 	// redirect normally
 	http.Redirect(w, r, then, http.StatusFound)
+}
+
+func (l *Login) revertPasswordConfirm(w http.ResponseWriter, r *http.Request) {
+	// delete loginState
+	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
+		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+	}
+
+	// redirect to console-service host
+	redirect := getConsoleServiceHost(r)
+
+	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+func getConsoleServiceHost(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	redirect := fmt.Sprintf("%s://%s", scheme, r.Host)
+	return redirect
 }
 
 // PasswordResetHandler resets the password
