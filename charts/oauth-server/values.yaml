@@ -7,7 +7,7 @@ config:
     port: 9096
 
   loginSessionConfig:
-    maxSeconds: 600
+    maxSeconds: 7200
     signingKey: "auth"
     encryptionKey: "encrypt123123123"
 
