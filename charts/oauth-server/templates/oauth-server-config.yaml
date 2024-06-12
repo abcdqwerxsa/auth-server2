@@ -30,8 +30,7 @@ data:
       },
       "LoginConfig": {
         "Provider": "fuyaoPasswordProvider",
-        "UserNamespace": "oauth-user",
-        "ConsoleServiceHost": "https://192.168.100.48:31616"
+        "UserNamespace": "oauth-user"
       },
       "OAuthServerConfig": {
         "CodeTokenNamespace": "oauth-code-token",

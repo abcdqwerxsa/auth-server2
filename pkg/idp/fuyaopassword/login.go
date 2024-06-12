@@ -71,12 +71,11 @@ func (l *LoginForm) OutputHTML(w http.ResponseWriter, tpl string, name string) {
 type Login struct {
 	Provider string
 	// CSRF csrf.CSRF
-	consoleServiceHost string
-	K8sClient          kubernetes.Interface
-	TokenStore         *fuyaostore.K8sSecretStore
-	Authenticator      authenticators.PasswordAuthenticator
-	idpLoginStore      *sessions.CookieStore
-	loginIPProtector   *protector.LoginIPProtector
+	K8sClient        kubernetes.Interface
+	TokenStore       *fuyaostore.K8sSecretStore
+	Authenticator    authenticators.PasswordAuthenticator
+	idpLoginStore    *sessions.CookieStore
+	loginIPProtector *protector.LoginIPProtector
 }
 
 // NewLogin returns the fuyao Login instance
@@ -88,13 +87,12 @@ func NewLogin(
 	loginConfig *config.LoginConfig,
 ) *Login {
 	return &Login{
-		Provider:           loginConfig.Provider,
-		consoleServiceHost: loginConfig.ConsoleServiceHost,
-		K8sClient:          k8sClient,
-		TokenStore:         tokenStore,
-		Authenticator:      authenticators.NewFuyaoPasswordAuthenticator(k8sClient, loginConfig.UserNamespace),
-		idpLoginStore:      idpLoginStore,
-		loginIPProtector:   loginIPProtector,
+		Provider:         loginConfig.Provider,
+		K8sClient:        k8sClient,
+		TokenStore:       tokenStore,
+		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, loginConfig.UserNamespace),
+		idpLoginStore:    idpLoginStore,
+		loginIPProtector: loginIPProtector,
 	}
 }
 

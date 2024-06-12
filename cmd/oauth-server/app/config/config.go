@@ -115,9 +115,8 @@ func (c *OAuthServerAPIServerConfig) Complete() *OAuthServerAPIServerConfig {
 
 // LoginConfig defines all config used by fuyao login provider
 type LoginConfig struct {
-	Provider           string `json:"Provider"`
-	UserNamespace      string `json:"UserNamespace"`
-	ConsoleServiceHost string `json:"ConsoleServiceHost"`
+	Provider      string `json:"Provider"`
+	UserNamespace string `json:"UserNamespace"`
 }
 
 func newDefaultLoginConfig() *LoginConfig {
@@ -138,11 +137,6 @@ func (l *LoginConfig) Validate() []error {
 	if l.UserNamespace == "" {
 		zlog.LogWarn("attempting to load userinfo from default namespace")
 		l.UserNamespace = "default"
-	}
-
-	if l.ConsoleServiceHost == "" {
-		zlog.LogError(fuyaoerrors.ErrStrConsoleServiceHostMissing)
-		errs = append(errs, fuyaoerrors.ErrConsoleServiceHostMissing)
 	}
 
 	return errs

@@ -22,7 +22,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"openfuyao/oauth-server/pkg/httpserver"
 	"strings"
 	"time"
 
@@ -42,6 +41,7 @@ import (
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/fuyaostore"
 	"openfuyao/oauth-server/pkg/generators"
+	"openfuyao/oauth-server/pkg/httpserver"
 	"openfuyao/oauth-server/pkg/sessions"
 	"openfuyao/oauth-server/pkg/zlog"
 )
@@ -64,8 +64,6 @@ type FuyaoAuthorizeServer struct {
 	oauthProxyStore map[string]map[string]string
 	// authCode2SessionID maps each auth-code to the central sessionID
 	authCode2SessionID map[string]string
-	// consoleServiceHost defines the console-service service host
-	consoleServiceHost string
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer

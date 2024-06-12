@@ -26,5 +26,5 @@ config:
 image:
   repository: "harbor.openfuyao.com/openfuyao/oauth-server"
   tag: "latest"
+  pullPolicy: "Always"
   digest: "276b803df5285ccc3af34ec158d0d5f34485685982df223b41c2df38fcf54887"
-  # image: "harbor.openfuyao.com/openfuyao/oauth-server:latest"
