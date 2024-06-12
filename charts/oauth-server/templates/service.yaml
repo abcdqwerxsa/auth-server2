@@ -13,4 +13,4 @@ spec:
       {{- end }}
   selector:
     application: "oauth-server"
-  type: {{ if .Values.config.httpServerConfig.nodePort }}NodePort{{ else }}ClusterIP{{ end }} #  NodePort
+  type: {{ if .Values.config.httpServerConfig.nodePort }}NodePort{{ else }}ClusterIP{{ end }}

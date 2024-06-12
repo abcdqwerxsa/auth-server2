@@ -152,9 +152,6 @@ const (
 
 	// ErrStrRedirectURIMissing represents the redirect uri is missing
 	ErrStrRedirectURIMissing = "the redirect uri is missing or incomplete"
-
-	// ErrStrConsoleServiceHostMissing represents the console-service host is missing
-	ErrStrConsoleServiceHostMissing = "the console-service host is missing or incomplete"
 )
 
 var (
@@ -290,9 +287,6 @@ var (
 
 	// ErrRedirectURIMissing represents the redirect uri is missing
 	ErrRedirectURIMissing = errors.New(ErrStrRedirectURIMissing)
-
-	// ErrConsoleServiceHostMissing represents the console-service host is missing
-	ErrConsoleServiceHostMissing = errors.New(ErrStrConsoleServiceHostMissing)
 )
 
 // ErrStatusCode is the mapper from error to http return error

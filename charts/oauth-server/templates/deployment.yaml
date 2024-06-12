@@ -23,8 +23,7 @@ spec:
       containers:
         - name: oauth-server
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-          # image: {{ .Values.config.image | default "harbor.openfuyao.com/openfuyao/oauth-server:latest" }}
-          imagePullPolicy: Always
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: https
               containerPort: {{ .Values.config.httpServerConfig.port }}
