@@ -16,10 +16,6 @@ spec:
         application: "oauth-server"
     spec:
       serviceAccountName: oauth-server
-      tolerations:
-        - key: "node-role.kubernetes.io/control-plane"
-          effect: "NoSchedule"
-          operator: "Exists"
       containers:
         - name: oauth-server
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}

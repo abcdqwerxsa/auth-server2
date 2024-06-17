@@ -14,11 +14,9 @@
 package oauth2
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -407,24 +405,26 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
 			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
 		}
-		httpserver.RespondWithStatusMsg(w, http.StatusUnauthorized, 0, "missing oauth-sessionid")
+		// we only log the error, the logout needs to proceed
+		httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
 		return
 	}
 	oauthServerSessionID := sessionArray[0]
 
 	// dispatch one by one
 	for sessionID, proxyEndpoint := range s.oauthProxyStore[oauthServerSessionID] {
-		// 创建请求 URL
-		url := fmt.Sprintf("%s?%s=%s", proxyEndpoint, constants.SessionIDParam, sessionID)
+		formData := url.Values{}
+		formData.Set(constants.SessionIDParam, sessionID)
 
 		// 创建 POST 请求
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte{}))
+		req, err := http.NewRequest("POST", proxyEndpoint, strings.NewReader(formData.Encode()))
 		if err != nil {
 			zlog.LogErrorf("Failed to create request: %v", err)
 		}
+		zlog.LogInfof("send logout request to %s", proxyEndpoint)
 
 		// 设置请求头，如果需要其他头部信息，可以在这里添加
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		// 发送请求
 		client := &http.Client{}

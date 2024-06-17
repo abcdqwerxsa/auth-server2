@@ -96,12 +96,6 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, passwd st
 		return false
 	}
 
-	// check that the password cannot contain more than two consecutive identical characters
-	if checkOverTwoConsecutiveChars(passwd) {
-		zlog.LogError("password cannot contain more than two consecutive identical characters")
-		return false
-	}
-
 	// check whether the password is contained in username / reversed username
 	if passwd == username || passwd == reverseString(username) {
 		zlog.LogError("password cannot be the same as the account number or the reverse account number")
