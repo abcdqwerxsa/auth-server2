@@ -33,7 +33,7 @@ func NewOAuthServerCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "openfuyao-oauth-server",
-		Short: "The authentication server to validate the access token.",
+		Short: "The authorization server to generate the oauth2 access token and manage the users.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := options.Validate(); err != nil {
 				zlog.LogFatal(err)

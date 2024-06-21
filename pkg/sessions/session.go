@@ -39,7 +39,6 @@ func NewSessionStore(name string, maxAge int, secrets ...[]byte) *CookieStore {
 	cookie.Options.MaxAge = maxAge
 	cookie.Options.HttpOnly = true
 	cookie.Options.Secure = true
-	cookie.Options.SameSite = http.SameSiteNoneMode
 	return &CookieStore{name: name, store: cookie, maxAge: maxAge}
 }
 
