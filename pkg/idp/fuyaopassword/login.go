@@ -341,7 +341,6 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// fetch form value
 	username := r.FormValue(constants.UsernameParam)
 	password := r.FormValue(constants.PasswordParam)
-	csrfToken := r.FormValue(constants.CSRFParam)
 	then := r.FormValue(constants.ThenParam)
 
 	// check form value
@@ -353,10 +352,10 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 		then = "/"
 	}
 	zlog.LogInfof("Login request: Username: %s, Then: %s\n", username, then)
-	zlog.LogWarnf("currently does not check csrfToken: %s", csrfToken)
 
 	// login devastation check
 	ipAddress := getIPAddress(r)
+	zlog.LogInfof("Login in from %s", ipAddress)
 	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
 		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
 			strconv.FormatInt(remainingTime, constants.Decimal), 1)
@@ -433,11 +432,23 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 
 // ---- util functions ----
 func getIPAddress(r *http.Request) string {
-	ipWithPort := r.RemoteAddr
+	// first fetch from X-Forwarded-For header
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		// X-Forwarded-For may have multiple ips
+		ips := strings.Split(xff, ",")
+		// return the first ip and trim it
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
 
-	// fetch the first part if port is contained in the ipWithPort
-	ipParts := strings.Split(ipWithPort, ":")
-	ip := ipParts[0]
+	// use RemoteAddr instead
+	ip := r.RemoteAddr
+	// remove the port if existed
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
 
 	return ip
 }
