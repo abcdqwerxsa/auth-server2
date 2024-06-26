@@ -48,7 +48,7 @@ const (
               </div>
                 <label class="form-label required-label" for="username">用户名</label>
                 <div class="form-input-line">
-                    <input id="username" name="username" type="text" value="" required="">
+                    <input id="username" name="username" type="text" value="" required="" autocomplete="off">
                 </div>
                 <div class="alert-line hidden-alert">请输入用户名!</div>
                 <label class="form-label required-label" for="password">密码</label>
@@ -77,10 +77,11 @@ const (
                             </path>
                         </svg>
                     </span>
-                    <input class="password-input" id="password" name="password" type="password" required="">
+                    <input class="password-input" id="password" name="password" type="password" required="" ` +
+		`autocomplete="off">
                 </div>
                 <div class="alert-line hidden-alert">请输入密码!</div>
-                <div><input id="csrf_token" name="csrf_token" type="text" value="{{.CSRFToken}}" hidden=""></div>
+                {{.CSRFToken}}
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden=""></div>
                 <div class="btn-block"><button type="submit" id="login-btn" class="btn-primary login-btn" ` +
 		`formnovalidate=""><span>登录</span></button>
@@ -260,7 +261,8 @@ const (
                             </path>
                         </svg>
                     </span>
-                    <input class="password-input" id="new-password" name="new_password" type="password">
+                    <input class="password-input" id="new-password" name="new_password" type="password" ` +
+		`autocomplete="off">
                 </div>
                 <div class="prompt-line prompt-default prompt-error">密码长度8~32位</div>
                 <div class="prompt-line prompt-default prompt-error">包含英文字母、数字、特殊字符` + "`" +
@@ -293,11 +295,11 @@ const (
                             </path>
                         </svg>
                     </span>
-                    <input class="password-input" id="confirm-password" name="confirm-password" type="password"
-                    >
+                    <input class="password-input" id="confirm-password" name="confirm-password" type="password" ` +
+		`autocomplete="off">
                 </div>
                 <div><input id="next" name="next" type="text" value="/" hidden readonly></div>
-                <div><input id="csrf_token" name="csrf_token" type="text" value="{{.CSRFToken}}" hidden></div>
+				{{.CSRFToken}}
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden></div>
                 <div class="prompt-line prompt-default prompt-error">两次输入密码需要一致</div>
                 <div class="btn-block">

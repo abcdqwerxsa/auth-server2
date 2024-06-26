@@ -65,14 +65,19 @@ func (s *CookieStore) Get(r *http.Request) Values {
 
 // Put stores the new cookie value to response writer
 func (s *CookieStore) Put(w http.ResponseWriter, v Values) error {
-	// store cookie expiration time
-	v[constants.CookieExpiry] = time.Now().Add(time.Second * time.Duration(s.maxAge)).Unix()
-
 	r := &http.Request{}
 	session, err := s.store.New(r, s.name)
 	if err != nil {
 		return err
 	}
+
+	// if v is empty, flush the cookie
+	if len(v) == 0 {
+		return s.store.Save(r, w, session)
+	}
+
+	// store cookie expiration time
+	v[constants.CookieExpiry] = time.Now().Add(time.Second * time.Duration(s.maxAge)).Unix()
 
 	// override the values for the session
 	session.Values = v
