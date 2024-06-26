@@ -174,7 +174,7 @@ const (
         .form-block .required-label::before{margin-inline-end:.25em;color:#ff4d4f;font-family:SimSun,sans-serif;` +
 		`content:"*"}
         .form-block input{box-sizing:border-box;padding:0 .5em;line-height:22px;height:32px;width:100%;` +
-		`border-radius:2px;background:#fff;border:1px solid #d9d9d9}
+		`border-radius:6px;background:#fff;border:1px solid #d9d9d9}
         .form-input-line{position:relative}
         .form-input-line .password-input{padding-right:7%}
         .password-input-icon{position:absolute;top:50%;right:2.5%;transform:translateY(-50%);display:flex;align-` +
@@ -184,7 +184,7 @@ const (
         .form-block input:focus{border:1px solid #1677ff;box-shadow:0 0 0 2px rgba(5,145,255,0.1)}
         .btn-block{margin-top:24px;display:flex;gap:1em;` +
 		`justify-content:right}
-        .btn-block button{width:96px;height:32px;border:0;border-radius:2px;cursor:pointer}
+        .btn-block button{width:96px;height:32px;border:0;border-radius:6px;cursor:pointer}
         .btn-primary{color:white;background-color:#356ac4}
         .btn-primary:hover{background-color:#4b8bea}
         .btn-primary:active{background-color:#234c9e}
@@ -465,7 +465,7 @@ const (
         .form-block .required-label::before{margin-inline-end:.25em;color:#ff4d4f;font-family:SimSun,sans-serif;` +
 		`content:"*"}
         .form-block input{box-sizing:border-box;padding:0 .5em;line-height:22px;height:32px;width:100%;border-` +
-		`radius:2px;background:#fff;border:1px solid #d9d9d9}
+		`radius:6px;background:#fff;border:1px solid #d9d9d9}
         .form-input-line{position:relative}
         .form-input-line .password-input{padding-right:7%}
         .password-input-icon{position:absolute;top:50%;right:2.5%;transform:translateY(-50%);display:flex;` +
@@ -474,7 +474,7 @@ const (
         .password-input-icon:hover+input,.form-block input:hover{border:1px solid #4096ff}
         .form-block input:focus{border:1px solid #1677ff;box-shadow:0 0 0 2px rgba(5,145,255,0.1)}
         .btn-block{margin-top:24px;display:flex;gap:1em;justify-content:right}
-        .btn-block button{width:96px;height:32px;border:0;border-radius:2px;cursor:pointer}
+        .btn-block button{width:96px;height:32px;border:0;border-radius:6px;cursor:pointer}
         .btn-primary{color:white;background-color:#356ac4}
         .btn-primary:hover{background-color:#4b8bea}
         .btn-primary:active{background-color:#234c9e}
