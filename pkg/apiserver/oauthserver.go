@@ -15,6 +15,7 @@ package apiserver
 
 import (
 	"context"
+	"github.com/gorilla/csrf"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -37,6 +38,7 @@ type OAuthServerAPIServer struct {
 	Router      *mux.Router
 	Login       *fuyaopassword.Login
 	OAuthServer *oauth2.FuyaoAuthorizeServer
+	Cfg         *overallconfigs.OAuthServerAPIServerConfig
 }
 
 // NewOAuthServerAPIServer inits a new oauthserver apiserver
@@ -67,15 +69,26 @@ func NewOAuthServerAPIServer(
 		Router:      router,
 		Login:       login,
 		OAuthServer: oauthServer,
+		Cfg:         cfg,
 	}, nil
 }
 
 // PrepareRun registers the router and the access logger
 func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
+	// logging
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
-	s.Router.HandleFunc(constants.FuyaoLoginEndpoint, s.Login.LoginHandler)
+
+	// csrf
+	CSRF := csrf.Protect([]byte(s.Cfg.IDPLoginStoreConfig.EncryptionKey),
+		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(s.Cfg.IDPLoginStoreConfig.SessionMaxAge))
+	loginRouter := s.Router.PathPrefix(constants.FuyaoLoginEndpoint).Subrouter()
+	confirmRouter := s.Router.PathPrefix(constants.FuyaoPasswordConfirmEndpoint).Subrouter()
+	loginRouter.Use(CSRF)
+	confirmRouter.Use(CSRF)
+
+	loginRouter.HandleFunc("", s.Login.LoginHandler)
 	s.Router.HandleFunc(constants.FuyaoLogoutEndpoint, s.OAuthServer.SingleLogoutHandler)
-	s.Router.HandleFunc(constants.FuyaoPasswordConfirmEndpoint, s.Login.PasswordConfirmHandler)
+	confirmRouter.HandleFunc("", s.Login.PasswordConfirmHandler)
 	s.Router.HandleFunc(constants.FuyaoPasswordModifyEndpoint, s.Login.PasswordResetHandler)
 	s.Router.HandleFunc(constants.FuyaoOAuthAuthorizeEndpoint, s.OAuthServer.OAuthAuthorizeHandler)
 	s.Router.HandleFunc(constants.FuyaoOAuthTokenEndpoint, s.OAuthServer.OAuthTokenHandler)

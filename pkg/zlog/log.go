@@ -21,10 +21,10 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/natefinch/lumberjack"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 const (

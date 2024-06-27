@@ -16,6 +16,7 @@ package protector
 import (
 	"container/list"
 	"math"
+	"openfuyao/oauth-server/pkg/zlog"
 	"time"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
@@ -65,6 +66,7 @@ func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) int {
 	if remainingAttempt < 0 {
 		remainingAttempt = 0
 	}
+	zlog.LogInfof("%s has %d attempts before getting blocked", ip, remainingAttempt)
 
 	return remainingAttempt
 }

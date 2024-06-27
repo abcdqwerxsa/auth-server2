@@ -27,6 +27,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/gorilla/csrf"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -130,14 +131,16 @@ func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request
 	// 生成 uri
 	uri, err := idp.GetBaseURL(r)
 	if err != nil {
+		zlog.LogErrorf("unable to fetch password confirm requestURL, err: %v", err)
 		http.Error(w, "unable to fetch requestURL", http.StatusInternalServerError)
 		return
 	}
 
 	// fetch then from r
 	then := r.URL.Query().Get(constants.ThenParam)
-	if len(then) == 0 {
-		then = "/"
+	if !isServerRelatedURL(then) {
+		http.Redirect(w, r, getConsoleServiceHost(r), http.StatusFound)
+		return
 	}
 
 	// get error from r
@@ -147,16 +150,18 @@ func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
 	if !ok {
-		http.Error(w, fuyaoerrors.ErrStrNotLogin, http.StatusUnauthorized)
+		zlog.LogErrorf("cannot enter password confirmation process, %s", fuyaoerrors.ErrStrNotLogin)
+		http.Redirect(w, r, getConsoleServiceHost(r), http.StatusFound)
 		return
 	}
 
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action:   uri.String(),
-		Then:     then,
-		UserName: username,
-		Error:    errString,
+		Action:    uri.String(),
+		Then:      then,
+		UserName:  username,
+		CSRFToken: string(csrf.TemplateField(r)),
+		Error:     errString,
 	}
 
 	// render form
@@ -304,15 +309,15 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	// 生成 uri
 	uri, err := idp.GetBaseURL(r)
 	if err != nil {
-		zlog.LogErrorf("unable to fetch requestURL, err: %v", err)
+		zlog.LogErrorf("unable to fetch login requestURL, err: %v", err)
 		http.Error(w, "unable to fetch requestURL", http.StatusInternalServerError)
 		return
 	}
 
-	// 从r中抽取then
 	then := r.URL.Query().Get(constants.ThenParam)
-	if len(then) == 0 {
-		then = "/"
+	if !isServerRelatedURL(then) {
+		http.Redirect(w, r, getConsoleServiceHost(r), http.StatusFound)
+		return
 	}
 
 	// redirect if already logged in
@@ -328,9 +333,10 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action: uri.String(),
-		Then:   then,
-		Error:  errString,
+		Action:    uri.String(),
+		Then:      then,
+		CSRFToken: string(csrf.TemplateField(r)),
+		Error:     errString,
 	}
 
 	// render form
@@ -341,7 +347,6 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// fetch form value
 	username := r.FormValue(constants.UsernameParam)
 	password := r.FormValue(constants.PasswordParam)
-	csrfToken := r.FormValue(constants.CSRFParam)
 	then := r.FormValue(constants.ThenParam)
 
 	// check form value
@@ -353,10 +358,10 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 		then = "/"
 	}
 	zlog.LogInfof("Login request: Username: %s, Then: %s\n", username, then)
-	zlog.LogWarnf("currently does not check csrfToken: %s", csrfToken)
 
 	// login devastation check
 	ipAddress := getIPAddress(r)
+	zlog.LogInfof("Login in from %s", ipAddress)
 	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
 		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
 			strconv.FormatInt(remainingTime, constants.Decimal), 1)
@@ -433,13 +438,40 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 
 // ---- util functions ----
 func getIPAddress(r *http.Request) string {
-	ipWithPort := r.RemoteAddr
+	// first fetch from X-Forwarded-For header
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		// X-Forwarded-For may have multiple ips
+		ips := strings.Split(xff, ",")
+		// return the first ip and trim it
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
 
-	// fetch the first part if port is contained in the ipWithPort
-	ipParts := strings.Split(ipWithPort, ":")
-	ip := ipParts[0]
+	// use RemoteAddr instead
+	ip := r.RemoteAddr
+	// remove the port if existed
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
 
 	return ip
+}
+
+func isServerRelatedURL(uri string) bool {
+	// check whether it is empty
+	if len(uri) == 0 {
+		return false
+	}
+
+	// check whether it follows url pattern
+	u, err := url.Parse(uri)
+	if err != nil {
+		return false
+	}
+
+	return strings.HasPrefix(u.Path, "/") && len(u.Scheme) == 0 && len(u.Host) == 0
 }
 
 func redirectGetMethodWithError(w http.ResponseWriter, r *http.Request, errString, then string) {
