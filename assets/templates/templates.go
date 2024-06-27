@@ -137,8 +137,8 @@ const (
     <style>
         body,html{margin:0;padding:0;font-size:14px;font-family:'Montserrat',sans-serif;box-sizing:border-box}
         input,button,.password-input-icon{outline:0;transition:all .2s cubic-bezier(0.645,0.045,0.355,1)}
-        #root{background:linear-gradient(70deg,#256cba,#a9d2f0);width:100vw;height:100vh;display:flex;align-items:` +
-		`center;justify-content:center}
+        #root{background:{{ .Base64Image }};background-repeat:norepeat;background-size:cover;width:100vw;` +
+		`height:100vh;display:flex;align-items:center;justify-content:center}
         .form-block{margin-left:500px;padding:0 64px;width:500px;height:500px;display:flex;flex-direction:column;` +
 		`justify-content:center;border-radius:4px;background:#fff;box-shadow:0 3px 10px rgba(51,51,51,0.1);` +
 		`box-sizing:border-box}
@@ -401,9 +401,16 @@ const (
             });
         });
 
+        function getCsrfToken() {
+            return document.querySelector('input[name="gorilla.csrf.Token"]').value;
+        }
+
         function sendDeleteRequest(url) {
             fetch(url, {
                 method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': getCsrfToken()
+                },
                 credentials: 'include' // 传递 cookies
             })
             .then(response => {
@@ -427,10 +434,10 @@ const (
     <style>
         body,html{margin:0;padding:0;font-size:14px;font-family:'Montserrat',sans-serif;box-sizing:border-box}
         input,button,.password-input-icon{outline:0;transition:all .2s cubic-bezier(0.645,0.045,0.355,1)}
-        #root{background:linear-gradient(70deg,#256cba,#a9d2f0);width:100vw;height:100vh;display:flex;` +
-		`align-items:center;justify-content:center}
-        .form-block{margin-left:500px;padding:0 64px;width:500px;height:500px;display:flex;flex-direction:column;` +
-		`justify-content:center;border-radius:4px;background:#fff;box-shadow:0 3px 10px rgba(51,51,51,0.1);` +
+        #root{background:{{ .Base64Image }};background-repeat:norepeat;background-size:cover;width:100vw;` +
+		`height:100vh;display:flex;align-items:center;justify-content:center}
+        .form-block{margin-left:500px;padding:0 64px;width:500px;height:500px;display:flex;flex-direction:` +
+		`column;justify-content:center;border-radius:4px;background:#fff;box-shadow:0 3px 10px rgba(51,51,51,0.1);` +
 		`box-sizing:border-box}
         .form-block h3{margin:0;font-size:24px;margin:24px 0;color:#333;font-weight:normal}
         .prompt-line{color:#89939b;margin:.25em 0;position:relative;margin-left:1.5em}

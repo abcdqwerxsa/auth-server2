@@ -44,5 +44,6 @@ WORKDIR /
 COPY --link --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --link --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --link --from=build --chmod=755 /go/bin/app entrypoint
+COPY --link --from=build --chmod=644 /go/src/app/assets/templates/loginBackground.png loginBackground.png
 
 ENTRYPOINT [ "./entrypoint" ]

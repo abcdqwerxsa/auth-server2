@@ -16,12 +16,14 @@ package fuyaopassword
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -48,11 +50,12 @@ import (
 
 // LoginForm contains the fields used by fuyao login
 type LoginForm struct {
-	Action    string
-	Then      string
-	CSRFToken string
-	UserName  string
-	Error     string
+	Action      string
+	Then        string
+	CSRFToken   string
+	Base64Image string
+	UserName    string
+	Error       string
 }
 
 // OutputHTML writes the contents back to web
@@ -155,13 +158,22 @@ func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// read image
+	imageData, err := readBase64Image(constants.LoginBackgroundPath)
+	if err != nil {
+		imageData = constants.DefaultLoginBackground
+	} else {
+		imageData = fmt.Sprintf(`url("data:image/png;base64,%s")`, imageData)
+	}
+
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action:    uri.String(),
-		Then:      then,
-		UserName:  username,
-		CSRFToken: string(csrf.TemplateField(r)),
-		Error:     errString,
+		Action:      uri.String(),
+		Then:        then,
+		UserName:    username,
+		Base64Image: imageData,
+		CSRFToken:   string(csrf.TemplateField(r)),
+		Error:       errString,
 	}
 
 	// render form
@@ -331,12 +343,21 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	// get error from r
 	errString := r.URL.Query().Get(constants.ErrorParam)
 
+	// read image
+	imageData, err := readBase64Image(constants.LoginBackgroundPath)
+	if err != nil {
+		imageData = constants.DefaultLoginBackground
+	} else {
+		imageData = fmt.Sprintf(`url("data:image/png;base64,%s")`, imageData)
+	}
+
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action:    uri.String(),
-		Then:      then,
-		CSRFToken: string(csrf.TemplateField(r)),
-		Error:     errString,
+		Action:      uri.String(),
+		Then:        then,
+		Base64Image: imageData,
+		CSRFToken:   string(csrf.TemplateField(r)),
+		Error:       errString,
 	}
 
 	// render form
@@ -472,6 +493,16 @@ func isServerRelatedURL(uri string) bool {
 	}
 
 	return strings.HasPrefix(u.Path, "/") && len(u.Scheme) == 0 && len(u.Host) == 0
+}
+
+func readBase64Image(filePath string) (string, error) {
+	imageData, err := os.ReadFile(filePath)
+	if err != nil {
+		zlog.LogErrorf("failed to read image file: %v", err)
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(imageData), nil
 }
 
 func redirectGetMethodWithError(w http.ResponseWriter, r *http.Request, errString, then string) {
