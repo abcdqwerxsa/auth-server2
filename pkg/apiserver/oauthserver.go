@@ -80,7 +80,28 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 
 	// csrf
 	CSRF := csrf.Protect([]byte(s.Cfg.IDPLoginStoreConfig.EncryptionKey),
-		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(s.Cfg.IDPLoginStoreConfig.SessionMaxAge))
+		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(s.Cfg.IDPLoginStoreConfig.SessionMaxAge),
+		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusForbidden)
+			htmlContent := `
+				<!DOCTYPE html>
+				<head>
+					<meta charset="UTF-8">
+					<title>OpenFuyao</title>
+				</head>
+				<body>
+					<h1>CSRF Token 过期</h1>
+					<p>您的登陆cookie已经过期</p>
+					<a href="/">点击此处重新进入openFuyao平台</a>
+				</body>
+				</html>
+			`
+			_, err := w.Write([]byte(htmlContent))
+			if err != nil {
+				zlog.LogErrorf("cannot write html content, err: %s", err)
+			}
+		})))
 	loginRouter := s.Router.PathPrefix(constants.FuyaoLoginEndpoint).Subrouter()
 	confirmRouter := s.Router.PathPrefix(constants.FuyaoPasswordConfirmEndpoint).Subrouter()
 	loginRouter.Use(CSRF)

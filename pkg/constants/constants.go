@@ -69,6 +69,8 @@ const (
 const (
 	LoginFormTemplate           = "loginForm"
 	PasswordConfirmFormTemplate = "passwordConfirmForm"
+	LoginBackgroundPath         = "/loginBackground.png"
+	DefaultLoginBackground      = "linear-gradient(70deg,#256cba,#a9d2f0)"
 )
 
 // Constants for password complexity check
