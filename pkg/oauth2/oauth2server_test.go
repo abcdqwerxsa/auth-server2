@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-oauth2/oauth2/v4/manage"
-	"github.com/go-oauth2/oauth2/v4/server"
 	"golang.org/x/oauth2"
+	"gopkg.in/oauth2.v3/manage"
+	"gopkg.in/oauth2.v3/server"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"

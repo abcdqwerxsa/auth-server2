@@ -113,28 +113,6 @@ func reverseString(s string) string {
 	return reversed
 }
 
-func checkOverTwoConsecutiveChars(s string) bool {
-	const maxConsecutiveChars = 2
-	count := 1 // counter to keep track of the current character's consecutive occurrences
-
-	// Iterate through the password starting from the second character
-	for i := 1; i < len(s); i++ {
-		// If the current character is the same as the previous character
-		if s[i] == s[i-1] {
-			count++ // Increment the counter
-			// If the count exceeds 2, return true as the password has more than two consecutive identical characters
-			if count > maxConsecutiveChars {
-				return true
-			}
-		} else {
-			count = 1 // Reset the counter if the current character is different from the previous one
-		}
-	}
-
-	// If no consecutive characters are found, return false
-	return false
-}
-
 func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username string) (user.Info, string, error) {
 	// get the secret
 	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
@@ -265,7 +243,7 @@ func (a *FuyaoPasswordAuthenticator) ConfirmPassword(ctx context.Context, userna
 	// check 旧密码是否没有改
 	if ok, err := a.encryptor.VerifyPassword(newPassword, base64EncryptedOldPassword); ok || err != nil {
 		if err == nil {
-			zlog.LogError("password verification failed")
+			zlog.LogError("password verification failed, err: %v", fuyaoerrors.ErrPasswordSame)
 			return fuyaoerrors.ErrPasswordSame
 		}
 		return err

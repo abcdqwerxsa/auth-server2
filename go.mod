@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/go-oauth2/oauth2/v4 v4.5.2
+	//github.com/go-oauth2/oauth2/v4 v4.5.2
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/gorilla/csrf v1.7.2
 	github.com/gorilla/mux v1.8.0
@@ -15,6 +15,7 @@ require (
 	golang.org/x/crypto v0.21.0
 	golang.org/x/oauth2 v0.16.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
+	gopkg.in/oauth2.v3 v3.12.0
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
 	k8s.io/apiserver v0.29.0
@@ -33,6 +34,7 @@ require (
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
@@ -42,7 +44,6 @@ require (
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt v3.2.1+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.17.7 // indirect
