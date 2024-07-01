@@ -188,11 +188,6 @@ func getLogWriter(conf *LogConfig) zapcore.WriteSyncer {
 	return zapcore.AddSync(os.Stdout)
 }
 
-// WithLogFields adds fields to the logging context.
-func WithLogFields(args ...interface{}) *zap.SugaredLogger {
-	return Logger.With(args...)
-}
-
 // LogDebug logs at DebugLevel.
 func LogDebug(args ...interface{}) {
 	Logger.Debug(args...)
@@ -211,16 +206,6 @@ func LogWarn(args ...interface{}) {
 // LogError Error logs at ErrorLevel.
 func LogError(args ...interface{}) {
 	Logger.Error(args...)
-}
-
-// LogDPanic logs at DPanicLevel.
-func LogDPanic(args ...interface{}) {
-	Logger.DPanic(args...)
-}
-
-// LogPanic logs at PanicLevel.
-func LogPanic(args ...interface{}) {
-	Logger.Panic(args...)
 }
 
 // LogFatal logs at FatalLevel.
@@ -248,94 +233,7 @@ func LogErrorf(template string, args ...interface{}) {
 	Logger.Errorf(template, args...)
 }
 
-// LogDPanicf logs a formatted message at DPanicLevel.
-func LogDPanicf(template string, args ...interface{}) {
-	Logger.DPanicf(template, args...)
-}
-
-// LogPanicf logs a formatted message at PanicLevel.
-func LogPanicf(template string, args ...interface{}) {
-	Logger.Panicf(template, args...)
-}
-
 // LogFatalf logs a formatted message at FatalLevel.
 func LogFatalf(template string, args ...interface{}) {
 	Logger.Fatalf(template, args...)
-}
-
-// LogDebugw logs a message with some additional context.
-func LogDebugw(msg string, keysAndValues ...interface{}) {
-	Logger.Debugw(msg, keysAndValues...)
-}
-
-// LogInfow logs a message with some additional context.
-func LogInfow(msg string, keysAndValues ...interface{}) {
-	Logger.Infow(msg, keysAndValues...)
-}
-
-// LogWarnw logs a message with some additional context.
-func LogWarnw(msg string, keysAndValues ...interface{}) {
-	Logger.Warnw(msg, keysAndValues...)
-}
-
-// LogErrorw logs a message with some additional context.
-func LogErrorw(msg string, keysAndValues ...interface{}) {
-	Logger.Errorw(msg, keysAndValues...)
-}
-
-// LogDPanicw logs a message with some additional context. In development, the
-// logger then panics. (See DPanicLevel for details.)
-func LogDPanicw(msg string, keysAndValues ...interface{}) {
-	Logger.DPanicw(msg, keysAndValues...)
-}
-
-// LogPanicw logs a message with some additional context, then panics.
-func LogPanicw(msg string, keysAndValues ...interface{}) {
-	Logger.Panicw(msg, keysAndValues...)
-}
-
-// LogFatalw logs a message with some additional context, then calls os.Exit.
-func LogFatalw(msg string, keysAndValues ...interface{}) {
-	Logger.Fatalw(msg, keysAndValues...)
-}
-
-// LogDebugln logs a message at [DebugLevel].
-func LogDebugln(args ...interface{}) {
-	Logger.Debugln(args...)
-}
-
-// LogInfoln logs a message at [InfoLevel].
-func LogInfoln(args ...interface{}) {
-	Logger.Infoln(args...)
-}
-
-// LogWarnln logs a message at [WarnLevel].
-func LogWarnln(args ...interface{}) {
-	Logger.Warnln(args...)
-}
-
-// LogErrorln logs a message at [ErrorLevel].
-func LogErrorln(args ...interface{}) {
-	Logger.Errorln(args...)
-}
-
-// LogDPanicln logs a message at [DPanicLevel].
-// In development, the logger then panics. (See [DPanicLevel] for details.)
-func LogDPanicln(args ...interface{}) {
-	Logger.DPanicln(args...)
-}
-
-// LogPanicln logs a message at [PanicLevel] and panics.
-func LogPanicln(args ...interface{}) {
-	Logger.Panicln(args...)
-}
-
-// LogFatalln logs a message at [FatalLevel] and calls os.Exit.
-func LogFatalln(args ...interface{}) {
-	Logger.Fatalln(args...)
-}
-
-// Sync flushes any buffered log entries.
-func Sync() error {
-	return Logger.Sync()
 }
