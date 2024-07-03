@@ -16,10 +16,10 @@ package generators
 import (
 	"bytes"
 	"encoding/base64"
-	"github.com/google/uuid"
-	"gopkg.in/oauth2.v3"
 	"strings"
 
+	"github.com/google/uuid"
+	"gopkg.in/oauth2.v3"
 	"gopkg.in/oauth2.v3/generates"
 )
 
@@ -33,13 +33,13 @@ type FuyaoAuthorizeGenerate struct {
 	generates.AuthorizeGenerate
 }
 
-// Token based on the UUID generated token, returns lowercase letters
-func (ag *FuyaoAuthorizeGenerate) Token(data *oauth2.GenerateBasic) (string, error) {
-	buf := bytes.NewBufferString(data.Client.GetID())
-	buf.WriteString(data.UserID)
-	token := uuid.NewMD5(uuid.Must(uuid.NewRandom()), buf.Bytes())
-	code := base64.URLEncoding.EncodeToString([]byte(token.String()))
-	code = strings.ToLower(strings.TrimRight(code, "="))
+// Token generate token according to the UUID token, returns lowercase letters
+func (ag *FuyaoAuthorizeGenerate) Token(basicInfo *oauth2.GenerateBasic) (string, error) {
+	bufferString := bytes.NewBufferString(basicInfo.Client.GetID())
+	bufferString.WriteString(basicInfo.UserID)
+	uuidToken := uuid.NewMD5(uuid.Must(uuid.NewRandom()), bufferString.Bytes())
+	authCode := base64.URLEncoding.EncodeToString([]byte(uuidToken.String()))
+	authCode = strings.ToLower(strings.TrimRight(authCode, "="))
 
-	return code, nil
+	return authCode, nil
 }

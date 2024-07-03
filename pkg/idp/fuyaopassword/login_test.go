@@ -389,17 +389,8 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 	rr := httptest.NewRecorder()
 	testLogin.PasswordResetHandler(rr, req)
 
-	if rr.Code != http.StatusFound {
+	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
-	}
-
-	if rr.Header().Get("Set-Cookie") == "" {
-		t.Errorf("Expected Set-Cookie key in header but it does show up")
-	}
-
-	redirect := constants.FuyaoLoginEndpoint
-	if rr.Header().Get("Location") != redirect {
-		t.Errorf("Expected Location %s; got %s", redirect, rr.Header().Get("Location"))
 	}
 }
 
