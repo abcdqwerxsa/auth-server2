@@ -14,7 +14,6 @@
 package oauth2
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"log"
@@ -23,14 +22,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-oauth2/oauth2/v4"
-	"github.com/go-oauth2/oauth2/v4/errors"
-	"github.com/go-oauth2/oauth2/v4/generates"
-	"github.com/go-oauth2/oauth2/v4/manage"
-	"github.com/go-oauth2/oauth2/v4/models"
-	"github.com/go-oauth2/oauth2/v4/server"
-	"github.com/go-oauth2/oauth2/v4/store"
 	"github.com/golang-jwt/jwt/v4"
+	"gopkg.in/oauth2.v3"
+	"gopkg.in/oauth2.v3/errors"
+	"gopkg.in/oauth2.v3/generates"
+	"gopkg.in/oauth2.v3/manage"
+	"gopkg.in/oauth2.v3/models"
+	"gopkg.in/oauth2.v3/server"
+	"gopkg.in/oauth2.v3/store"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 
@@ -96,7 +95,7 @@ func NewOAuthServer(
 	// auth code and jwt access token generator
 	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
 	manager.MapAccessGenerate(
-		generates.NewJWTAccessGenerate(cfg.JWTKeyID, []byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
+		generates.NewJWTAccessGenerate([]byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
 
 	// storage
 	clientStore := store.NewClientStore()
@@ -135,8 +134,6 @@ func NewOAuthServer(
 // OAuthAuthorizeHandler http handler for /oauth/authorize
 func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	// fetch params
-	ctx := r.Context()
-
 	req, err := s.ValidateAuthorizeRequest(r)
 	if err != nil {
 		s.redirectAuthorizationCodeError(w, req, err)
@@ -171,7 +168,7 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 
 	// generate the oauth code
 	req.UserID = userResponse.User.GetName()
-	ti, err := s.GetAuthorizeToken(ctx, &req.AuthorizeRequest)
+	ti, err := s.GetAuthorizeToken(&req.AuthorizeRequest)
 	if err != nil {
 		s.redirectAuthorizationCodeError(w, req, err)
 		return
@@ -179,7 +176,7 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 
 	// use the default client domain if the redirect URI is empty
 	if req.RedirectURI == "" {
-		client, err := s.Manager.GetClient(ctx, req.ClientID)
+		client, err := s.Manager.GetClient(req.ClientID)
 		if err != nil {
 			s.redirectAuthorizationCodeError(w, req, err)
 			return
@@ -214,8 +211,6 @@ func (s *FuyaoAuthorizeServer) storeToCodeSessionIDMapper(r *http.Request, ti oa
 
 // OAuthTokenHandler http handler for /oauth/token
 func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	gt, tgr, err := s.ValidationTokenRequest(r)
 	if err != nil {
 		s.generateTokenError(w, err)
@@ -224,7 +219,7 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 
 	s.registerOauthProxyComponents(r)
 
-	ti, err := s.GetAccessToken(ctx, gt, tgr)
+	ti, err := s.GetAccessToken(gt, tgr)
 	if err != nil {
 		// delete expired authorization code
 		if delErr := s.deleteExpiredAuthCode(tgr); delErr != nil {
@@ -368,7 +363,7 @@ func (s *FuyaoAuthorizeServer) GetErrorData(err error) (map[string]interface{}, 
 // deleteExpiredAuthCode flush the auth code secret if expiry
 func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRequest) error {
 	code := tgr.Code
-	ti, err := s.tokenStore.GetByCode(context.Background(), code)
+	ti, err := s.tokenStore.GetByCode(code)
 
 	if err != nil {
 		zlog.LogErrorf("cannot get auth code, err: %v", err)
@@ -376,7 +371,7 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 	}
 	if ti != nil && ti.GetCodeCreateAt().Add(ti.GetCodeExpiresIn()).Before(time.Now()) {
 		// delete the auth code
-		if err = s.tokenStore.RemoveByCode(context.Background(), code); err != nil {
+		if err = s.tokenStore.RemoveByCode(code); err != nil {
 			return err
 		}
 		zlog.LogInfof("successfully delete auth code in secret")
