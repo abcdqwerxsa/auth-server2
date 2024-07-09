@@ -140,7 +140,7 @@ const (
                         </svg>
                     </span>
                     <input class="password-input" id="password" name="password" type="password" required="" ` +
-		`autocomplete="off">
+		`oncopy="return false" autocomplete="off">
                 </div>
                 <div class="alert-line hidden-alert">请输入密码!</div>
                 {{.CSRFToken}}
@@ -323,7 +323,7 @@ const (
                         </svg>
                     </span>
                     <input class="password-input" id="new-password" name="new_password" type="password" ` +
-		`autocomplete="off">
+		`oncopy="return false" autocomplete="off">
                 </div>
                 <div class="prompt-line prompt-default prompt-error">密码长度8~32位</div>
                 <div class="prompt-line prompt-default prompt-error">包含英文字母、数字、特殊字符` + "`" +
@@ -357,7 +357,7 @@ const (
                         </svg>
                     </span>
                     <input class="password-input" id="confirm-password" name="confirm-password" type="password" ` +
-		`autocomplete="off">
+		`oncopy="return false" autocomplete="off">
                 </div>
                 <div><input id="next" name="next" type="text" value="/" hidden readonly></div>
 				{{.CSRFToken}}
