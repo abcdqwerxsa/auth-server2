@@ -14,9 +14,7 @@ data:
       },
       "IDPLoginStoreConfig": {
         "SessionName": "idpLogin",
-        "SessionMaxAge": {{ .Values.config.loginSessionConfig.maxSeconds | quote }},
-        "SigningKey": {{ .Values.config.loginSessionConfig.signingKey | quote }},
-        "EncryptionKey": {{ .Values.config.loginSessionConfig.encryptionKey | quote }}
+        "SessionMaxAge": {{ .Values.config.loginSessionConfig.maxSeconds | quote }}
       },
       "IPProtectorConfig": {
         "FailTimes": {{ .Values.config.ipProtectorConfig.failTimes | quote }},
@@ -39,7 +37,6 @@ data:
         "RefreshTokenExp": "2h",
         "IsGenerateRefresh": false,
         "JWTKeyID": "access_token_sign_key",
-        "JWTPrivateKey": "i_am_the_secrets",
         "ClientMapper": {
           "console": {{ .Values.config.oauthServerConfig.clientSecret.console | quote }},
           "oauth-proxy": {{ .Values.config.oauthServerConfig.clientSecret.oauthProxy | quote }}

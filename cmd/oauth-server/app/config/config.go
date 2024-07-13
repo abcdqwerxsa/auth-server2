@@ -187,8 +187,6 @@ func newIDPLoginStoreConfig() *IDPLoginStoreConfig {
 	return &IDPLoginStoreConfig{
 		SessionName:   "idpLogin",
 		SessionMaxAge: 300,
-		SigningKey:    "auth",
-		EncryptionKey: "encrypt123123123",
 	}
 }
 
@@ -241,7 +239,6 @@ func newOAuthServerConfig() *OAuthServerConfig {
 		RefreshTokenExp:    time.Hour * refreshTokenExpHours,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
 		ClientMapper: map[string]string{
 			"console": "console-password",
 		},
