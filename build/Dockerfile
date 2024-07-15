@@ -22,7 +22,7 @@ FROM harbor.openfuyao.com/openfuyao/base-layout AS final
 
 WORKDIR /
 
-COPY --link --from=build --chmod=755 /go/bin/app entrypoint
-COPY --link --from=build --chmod=644 /go/src/app/assets/templates/loginBackground.png loginBackground.png
+COPY --link --from=build --chmod=555 /go/bin/app entrypoint
+COPY --link --from=build --chmod=444 /go/src/app/assets/templates/loginBackground.png loginBackground.png
 
 ENTRYPOINT [ "./entrypoint" ]
