@@ -14,7 +14,10 @@
 package options
 
 import (
+	"encoding/base64"
 	"github.com/spf13/viper"
+	"openfuyao/oauth-server/pkg/zlog"
+	"os"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
@@ -52,6 +55,41 @@ func (o *OAuthServerOption) ReadConfig() (*config.OAuthServerAPIServerConfig, er
 		return nil, err
 	}
 
+	// manually add secret keys
+	jwtPrivateKeyDecoded, err := readFromSecret("/oauth-jwt.key")
+	if err != nil {
+		return nil, err
+	}
+	oAuthServerConfig.OAuthServerConfig.JWTPrivateKey = jwtPrivateKeyDecoded
+
+	signKeyDecoded, err := readFromSecret("/oauth-cookie-sign.key")
+	if err != nil {
+		return nil, err
+	}
+	oAuthServerConfig.IDPLoginStoreConfig.SigningKey = signKeyDecoded
+
+	encryptKeyDecoded, err := readFromSecret("/oauth-cookie-encrypt.key")
+	if err != nil {
+		return nil, err
+	}
+	oAuthServerConfig.IDPLoginStoreConfig.EncryptionKey = encryptKeyDecoded
+
 	return &oAuthServerConfig, nil
 
+}
+
+func readFromSecret(filePath string) (string, error) {
+	b64Key, err := os.ReadFile(filePath)
+	if err != nil {
+		zlog.LogErrorf("read secret failed")
+		return "", err
+	}
+
+	keyDecoded, err := base64.StdEncoding.DecodeString(string(b64Key))
+	if err != nil {
+		zlog.LogWarnf("Error decoding base64: %v, use it directly", err)
+		return string(b64Key), err
+	} else {
+		return string(keyDecoded), err
+	}
 }

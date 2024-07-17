@@ -8,8 +8,8 @@ config:
 
   loginSessionConfig:
     maxSeconds: 7200
-    signingKey: "auth"
-    encryptionKey: "encrypt123123123"
+    signingKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    encryptionKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
   ipProtectorConfig:
     failTimes: "5"
@@ -19,6 +19,7 @@ config:
   oauthServerConfig:
     authCodeExp: "5m"
     accessTokenExp: "2h"
+    JWTPrivateKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     clientSecret:
       console: "console-password"
       oauthProxy: "SECRETTS"

@@ -332,14 +332,6 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// redirect if already logged in
-	loginData := l.idpLoginStore.Get(r)
-	_, ok := loginData.GetString(constants.UserName)
-	if ok {
-		http.Redirect(w, r, then, http.StatusFound)
-		return
-	}
-
 	// get error from r
 	errString := r.URL.Query().Get(constants.ErrorParam)
 
@@ -422,6 +414,12 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// successfully login, erase ip block flag
 	l.loginIPProtector.Unlock(ipAddress)
+
+	// redirect if already logged in
+	if _, ok = l.idpLoginStore.Get(r).GetString(constants.UserName); ok {
+		http.Redirect(w, r, then, http.StatusFound)
+		return
+	}
 
 	if err = l.saveLoginStateToSession(response.User, w); err != nil {
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrLoginServiceDown, then)

@@ -41,6 +41,18 @@ spec:
               readOnly: true
               subPath: config.json
               mountPath: /config.json
+            - name: oauth-jwt-cookie-secret
+              readOnly: true
+              mountPath: /oauth-jwt.key
+              subPath: oauth-jwt.key
+            - name: oauth-jwt-cookie-secret
+              readOnly: true
+              mountPath: /oauth-cookie-sign.key
+              subPath: oauth-cookie-sign.key
+            - name: oauth-jwt-cookie-secret
+              readOnly: true
+              mountPath: /oauth-cookie-encrypt.key
+              subPath: oauth-cookie-encrypt.key
       volumes:
         - name: oauth-serving-ca
           configMap:
@@ -51,3 +63,6 @@ spec:
         - name: config-volume
           configMap:
             name: oauth-server-config
+        - name: oauth-jwt-cookie-secret
+          secret:
+            secretName: oauth-jwt-cookie-secret

@@ -108,6 +108,7 @@ func NewHttpServer(options *ServerOptions) (*http.Server, error) {
 		server.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{certificate},
 			ClientAuth:   tls.RequestClientCert,
+			MinVersion:   tls.VersionTLS12,
 			ClientCAs:    caCertPool,
 		}
 		server.Addr = fmt.Sprintf(":%d", options.HttpsPort)
