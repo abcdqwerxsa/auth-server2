@@ -63,7 +63,6 @@ func getDefaultKubeConfigFile() string {
 		}
 	}
 
-	// here use the node kubeconfig for debugging
 	userHomeConfig := path.Join(homePath, ".kube/config")
 	if _, err := os.Stat(userHomeConfig); err == nil {
 		kubeConfigFile = userHomeConfig

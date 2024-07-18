@@ -8,6 +8,7 @@ config:
 
   loginSessionConfig:
     maxSeconds: 7200
+    # signingKey和encryptionKey会在openFuyao安装的时候由installer生成并覆盖
     signingKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     encryptionKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
@@ -19,6 +20,7 @@ config:
   oauthServerConfig:
     authCodeExp: "5m"
     accessTokenExp: "2h"
+    # JWTPrivateKey会在在openFuyao安装的时候由installer生成并覆盖
     JWTPrivateKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     clientSecret:
       console: "console-password"
