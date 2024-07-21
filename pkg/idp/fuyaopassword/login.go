@@ -370,11 +370,10 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	if len(then) == 0 {
 		then = "/"
 	}
-	zlog.LogInfof("Login request: Username: %s, Then: %s\n", username, then)
+	zlog.LogInfof("Login request from: Username: %s\n", username)
 
 	// login devastation check
 	ipAddress := getIPAddress(r)
-	zlog.LogInfof("Login in from %s", ipAddress)
 	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
 		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
 			strconv.FormatInt(remainingTime, constants.Decimal), 1)

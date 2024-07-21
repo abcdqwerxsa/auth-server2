@@ -52,6 +52,7 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Content-Security-Policy", "connect-src 'self' https:;")
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 
 		// Create a new responseLogger
 		rl := &responseLogger{
@@ -66,8 +67,7 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 			logFunc = zlog.LogWarnf
 		}
 		logFunc(
-			`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
-			r.RemoteAddr,
+			`[%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
 			start.Format("02/Jan/2006:15:04:05 -0700"),
 			time.Since(start).Milliseconds(),
 			r.Method,
