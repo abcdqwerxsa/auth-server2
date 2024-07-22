@@ -79,7 +79,7 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
 
 	// csrf
-	CSRF := csrf.Protect([]byte(s.Cfg.IDPLoginStoreConfig.EncryptionKey),
+	CSRF := csrf.Protect([]byte(s.Cfg.IDPLoginStoreConfig.EncryptionKey), csrf.SameSite(csrf.SameSiteStrictMode),
 		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(s.Cfg.IDPLoginStoreConfig.SessionMaxAge),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/html")
