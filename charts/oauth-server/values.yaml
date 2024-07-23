@@ -5,6 +5,19 @@
 config:
   httpServerConfig:
     port: 9096
+    enableHttps: true
+    tlsCert: |
+      -----BEGIN CERTIFICATE-----
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      -----END CERTIFICATE-----
+    tlsKey: |
+      -----BEGIN PRIVATE KEY-----
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      -----END PRIVATE KEY-----
+    rootCA: |
+      -----BEGIN CERTIFICATE-----
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      -----END CERTIFICATE-----
 
   loginSessionConfig:
     maxSeconds: 7200

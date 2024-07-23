@@ -88,7 +88,7 @@ func (s *K8sSecretStore) createByCode(info oauth2.TokenInfo) error {
 	// create the secret
 	_, err = s.k8sClient.CoreV1().Secrets(s.ns).Create(context.Background(), secret, metav1.CreateOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot create code secret %s, err: %v", info.GetCode(), err)
+		zlog.LogErrorf("cannot create code secret")
 		return fuyaoerrors.ErrFailToCreateSecret
 	}
 
@@ -115,7 +115,7 @@ func (s *K8sSecretStore) RemoveByCode(code string) error {
 	name := constants.CodePrefix + code
 	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), name, metav1.DeleteOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot delete auth-code secret %s, err: %v", code, err)
+		zlog.LogErrorf("cannot delete auth-code secret")
 		return fuyaoerrors.ErrFailToDeleteSecret
 	}
 
@@ -127,7 +127,7 @@ func (s *K8sSecretStore) RemoveByAccess(access string) error {
 	name := refactorSecretName(constants.AccessPrefix + access)
 	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), name, metav1.DeleteOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot delete access-token secret %s, err: %v", access, err)
+		zlog.LogErrorf("cannot delete access-token secret")
 		return fuyaoerrors.ErrFailToDeleteSecret
 	}
 
@@ -145,7 +145,7 @@ func (s *K8sSecretStore) GetByCode(code string) (oauth2.TokenInfo, error) {
 	name := constants.CodePrefix + code
 	userdata, err := s.k8sClient.CoreV1().Secrets(s.ns).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot get auth-code secret %s, err: %v", code, err)
+		zlog.LogErrorf("cannot get auth-code secret")
 		return nil, fuyaoerrors.ErrFailToGetSecret
 	}
 
@@ -159,7 +159,7 @@ func (s *K8sSecretStore) GetByAccess(access string) (oauth2.TokenInfo, error) {
 	name := refactorSecretName(constants.AccessPrefix + access)
 	userdata, err := s.k8sClient.CoreV1().Secrets(s.ns).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot get access-token secret %s, err: %v", access, err)
+		zlog.LogErrorf("cannot get access-token secret")
 		return nil, fuyaoerrors.ErrFailToGetSecret
 	}
 
@@ -176,7 +176,7 @@ func (s *K8sSecretStore) decodeUserInfo(data []byte) (oauth2.TokenInfo, error) {
 	var userinfo models.Token
 	err := json.Unmarshal(data, &userinfo)
 	if err != nil {
-		zlog.LogErrorf("cannot unmarshal secret data, err: %v", err)
+		zlog.LogErrorf("cannot unmarshal secret data")
 		return nil, fuyaoerrors.ErrFailToUnmarshalData
 	}
 

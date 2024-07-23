@@ -1,0 +1,10 @@
+{{- if .Values.config.httpServerConfig.enableHttps }}
+apiVersion: v1
+data:
+  ca.crt: |
+    {{ b64enc .Values.config.httpServerConfig.rootCA }}
+kind: ConfigMap
+metadata:
+  name: oauth-server-serving-ca
+  namespace: fuyao-oauth
+{{- end }}
