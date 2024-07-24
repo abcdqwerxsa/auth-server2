@@ -439,6 +439,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		return
 	}
 	delete(s.oauthProxyStore, oauthServerSessionID)
+	zlog.LogInfof("Logout succeed for user")
 
 	// no content to return
 	httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")

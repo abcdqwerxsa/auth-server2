@@ -152,6 +152,9 @@ const (
 
 	// ErrStrRedirectURIMissing represents the redirect uri is missing
 	ErrStrRedirectURIMissing = "the redirect uri is missing or incomplete"
+
+	// ErrStrInvalidThen represents the then param is invalid
+	ErrStrInvalidThen = "错误的重定向地址，请从首页重新登录"
 )
 
 var (

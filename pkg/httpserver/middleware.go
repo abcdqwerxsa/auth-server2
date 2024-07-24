@@ -67,7 +67,8 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 			logFunc = zlog.LogWarnf
 		}
 		logFunc(
-			`[%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
+			`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
+			r.RemoteAddr,
 			start.Format("02/Jan/2006:15:04:05 -0700"),
 			time.Since(start).Milliseconds(),
 			r.Method,
