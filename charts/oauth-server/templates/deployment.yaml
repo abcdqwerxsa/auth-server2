@@ -26,6 +26,7 @@ spec:
           args:
             - --configFile=config.json
           volumeMounts:
+            {{- if .Values.config.httpServerConfig.enableHttps }}
             - name: oauth-serving-ca
               mountPath: /ssl/ca.pem
               subPath: ca.crt
@@ -37,6 +38,7 @@ spec:
               readOnly: true
               mountPath: /ssl/server.crt
               subPath: tls.crt
+            {{- end }}
             - name: config-volume
               readOnly: true
               subPath: config.json
@@ -54,12 +56,14 @@ spec:
               mountPath: /oauth-cookie-encrypt.key
               subPath: oauth-cookie-encrypt.key
       volumes:
+        {{- if .Values.config.httpServerConfig.enableHttps }}
         - name: oauth-serving-ca
           configMap:
-            name: oauth-serving-ca
+            name: oauth-server-serving-ca
         - name: oauth-server-server
           secret:
             secretName: oauth-server-server
+        {{- end }}
         - name: config-volume
           configMap:
             name: oauth-server-config

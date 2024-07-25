@@ -7,10 +7,14 @@ data:
   config.json: |
     {
       "HttpServerConfig": {
+        {{- if .Values.config.httpServerConfig.enableHttps }}
         "HttpsPort": {{ .Values.config.httpServerConfig.port }},
         "TlsCertFile": "/ssl/server.crt",
         "TlsPrivateKeyFile": "/ssl/server.key",
         "RootCAFile": "/ssl/ca.pem"
+        {{- else }}
+        "HttpPort": {{ .Values.config.httpServerConfig.port }}
+        {{- end }}
       },
       "IDPLoginStoreConfig": {
         "SessionName": "idpLogin",

@@ -1,0 +1,13 @@
+{{- if .Values.config.httpServerConfig.enableHttps }}
+apiVersion: v1
+data:
+  tls.crt: |
+    {{ b64enc .Values.config.httpServerConfig.tlsCert }}
+  tls.key: |
+    {{ b64enc .Values.config.httpServerConfig.tlsKey }}
+kind: Secret
+metadata:
+  name: oauth-server-server
+  namespace: fuyao-oauth
+type: kubernetes.io/tls
+{{- end }}

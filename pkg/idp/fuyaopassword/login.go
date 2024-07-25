@@ -185,6 +185,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	loginData := l.idpLoginStore.Get(r)
 	username, ok := loginData.GetString(constants.UserName)
 	if !ok {
+		zlog.LogErrorf("Password confirmation fail for user %s, err: the idpLogin cookie is missing", username)
 		http.Redirect(w, r, getConsoleServiceHost(r), http.StatusFound)
 		return
 	}
@@ -192,6 +193,8 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	newPassword := r.FormValue(constants.NewPasswordParam)
 	then := r.FormValue(constants.ThenParam)
 	if len(newPassword) == 0 {
+		zlog.LogErrorf("Password confirmation fail for user %s, err: %v", username,
+			fuyaoerrors.ErrUsernameOrPasswordMissing)
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrUsernameOrPasswordMissing, then)
 		return
 	}
@@ -201,6 +204,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 
 	// password confirmation logic
 	if err := l.Authenticator.ConfirmPassword(context.Background(), username, newPassword); err != nil {
+		zlog.LogErrorf("Password confirmation fail for user %s, err: %v", username, err)
 		redirectGetMethodWithError(w, r, err.Error(), then)
 		return
 	}
@@ -215,7 +219,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	} else {
 		zlog.LogInfo("Successfully set idpLogin state for password confirmation.")
 	}
-	zlog.LogInfof("Password Confirmation succeed for user: %s", username)
+	zlog.LogInfof("Password confirmation succeed for user: %s", username)
 
 	// redirect normally
 	http.Redirect(w, r, then, http.StatusFound)
@@ -253,18 +257,21 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	// add an access token validation, since all the services are required to expose in this version
 	accessToken, err := l.getAccessToken(r)
 	if err != nil {
+		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, http.StatusUnauthorized, 0, fuyaoerrors.ErrStrNotLogin)
 		return
 	}
 
 	loggedIn, err := l.authenticateByWebhook(accessToken)
 	if !loggedIn || err != nil {
+		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
 	}
 
 	// read params from r.url
 	var requestBody PasswordResetRequest
 	if err = json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
 		return
 	}
@@ -273,11 +280,13 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	oldPassword := requestBody.OriginalPassword
 	newPassword := requestBody.NewPassword
 	if len(username) == 0 || len(oldPassword) == 0 || len(newPassword) == 0 {
+		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrUsernameOrPasswordMissing)
 		return
 	}
 
 	if err := l.Authenticator.ResetPassword(context.Background(), username, oldPassword, newPassword); err != nil {
+		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
 		return
 	}
@@ -374,9 +383,11 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// login devastation check
 	ipAddress := getIPAddress(r)
+	zlog.LogInfof("Login from %s", ipAddress)
 	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
 		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
 			strconv.FormatInt(remainingTime, constants.Decimal), 1)
+		zlog.LogErrorf("Login request fail, the ip %s is still blocked", ipAddress)
 		redirectGetMethodWithError(w, r, errString, then)
 		return
 	}
@@ -386,28 +397,14 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// service internal error
 	if err != nil && !errors.Is(err, fuyaoerrors.ErrPasswordAuthenticationFailed) {
+		zlog.LogErrorf("Login request fail, error: %v", err)
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrLoginServiceDown, then)
 		return
 	}
 
 	// password authentication error
 	if !ok {
-		// current ip failed times +1
-		remainingAttempt := l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
-
-		// still got login attempts
-		if remainingAttempt > 0 {
-			errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedWithCount, "%s",
-				strconv.FormatInt(int64(remainingAttempt), constants.Decimal), 1)
-			redirectGetMethodWithError(w, r, errString, then)
-			return
-		}
-
-		// trigger ip blocking
-		lockDuration := int64(l.loginIPProtector.LockDuration.Minutes())
-		errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedLocked, "%s",
-			strconv.FormatInt(lockDuration, constants.Decimal), 1)
-		redirectGetMethodWithError(w, r, errString, then)
+		l.checkForIPBlocking(w, r, ipAddress, then)
 		return
 	}
 
@@ -421,6 +418,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = l.saveLoginStateToSession(response.User, w); err != nil {
+		zlog.LogErrorf("Login request fail, error: %v", err)
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrLoginServiceDown, then)
 		return
 	}
@@ -428,6 +426,28 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	zlog.LogInfof("Successfully logging in with %s", response.User.GetName())
 	// 重定向回到 /oauth/authorize
 	http.Redirect(w, r, then, http.StatusFound)
+}
+
+func (l *Login) checkForIPBlocking(w http.ResponseWriter, r *http.Request, ipAddress string, then string) {
+	// current ip failed times +1
+	remainingAttempt := l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
+
+	// still got login attempts
+	if remainingAttempt > 0 {
+		errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedWithCount, "%s",
+			strconv.FormatInt(int64(remainingAttempt), constants.Decimal), 1)
+		zlog.LogErrorf("Login request fail, error: %s", errString)
+		redirectGetMethodWithError(w, r, errString, then)
+		return
+	}
+
+	// trigger ip blocking
+	lockDuration := int64(l.loginIPProtector.LockDuration.Minutes())
+	errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedLocked, "%s",
+		strconv.FormatInt(lockDuration, constants.Decimal), 1)
+	zlog.LogErrorf("Login request fail and trigger ip blocking for %s", ipAddress)
+	redirectGetMethodWithError(w, r, errString, then)
+	return
 }
 
 func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) error {
@@ -490,6 +510,20 @@ func isServerRelatedURL(uri string) bool {
 	}
 
 	return strings.HasPrefix(u.Path, "/") && len(u.Scheme) == 0 && len(u.Host) == 0
+}
+
+func isValidThenURL(uri string) bool {
+	if !strings.HasPrefix(uri, constants.FuyaoOAuthAuthorizeEndpoint+"?") {
+		return false
+	}
+
+	const validLen = 2
+	parts := strings.Split(uri, "?")
+	if len(parts) != validLen {
+		return false
+	}
+
+	return true
 }
 
 func readBase64Image(filePath string) (string, error) {
