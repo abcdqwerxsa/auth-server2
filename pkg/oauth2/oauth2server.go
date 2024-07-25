@@ -19,6 +19,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -311,10 +312,29 @@ func (s *FuyaoAuthorizeServer) ValidateAuthorizeRequest(r *http.Request) (*Fuyao
 		return nil, fuyaoerrors.ErrIdentityProviderIncorrect
 	}
 
+	// fetch the redirect_uri for regex filtering
+	if !isValidRedirectURI(r.FormValue("redirect_uri")) {
+		return &FuyaoAuthorizeRequest{
+			AuthorizeRequest: *req,
+			identityProvider: idp,
+		}, fuyaoerrors.ErrRedirectURIIncorrect
+	}
+
 	return &FuyaoAuthorizeRequest{
 		AuthorizeRequest: *req,
 		identityProvider: idp,
 	}, nil
+}
+
+func isValidRedirectURI(s string) bool {
+	regexPattern := `^(?:(?:https?://(?:[\w.-]+|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d{1,5})?)|[\w.-]` +
+		`+(?:\.\w{2,})?)?(/rest/auth/callback|/[a-z]+/oauth/callback)$`
+	match, err := regexp.MatchString(regexPattern, s)
+	if err != nil {
+		zlog.LogErrorf("Error compiling regex:", err)
+		return false
+	}
+	return match
 }
 
 // AuthorizeThroughSession authorize the user with session stored data
