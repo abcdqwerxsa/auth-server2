@@ -93,7 +93,7 @@ const (
     <div id="root">
         <div class="form-block">
             <h3>欢迎登录openFuyao</h3>
-            <form id="login-form" autocomplete="off" action="{{.Action}}" method="POST">
+            <form id="login-form" autocomplete="off">
               <div class="error-placeholder">
                 {{ if .Error }}
                 <p class="pf-c-form__helper-text pf-m-error">
@@ -140,7 +140,7 @@ const (
                         </svg>
                     </span>
                     <input class="password-input" id="password" name="password" type="password" required="" ` +
-		`oncopy="return false" autocomplete="off">
+		`autocomplete="off">
                 </div>
                 <div class="alert-line hidden-alert">请输入密码!</div>
                 {{.CSRFToken}}
@@ -163,12 +163,12 @@ const (
             } else {
                 input.type = 'password';
             }
-        }
+        };
 
         let usernameValid = false;
         let passwordValid = false;
-        const usernameAlert = document.getElementsByClassName("alert-line")[0]
-        const passwordAlert = document.getElementsByClassName("alert-line")[1]
+        const usernameAlert = document.getElementsByClassName("alert-line")[0];
+        const passwordAlert = document.getElementsByClassName("alert-line")[1];
 
         const switchAlertVisibility = (inputAlert, testRes) => {
             if (testRes) {
@@ -176,25 +176,42 @@ const (
             } else {
                 inputAlert.classList.remove("hidden-alert");
             }
-        }
+        };
 
         document.getElementById("username").addEventListener("input", (event) => {
-            usernameValid = event.target.value.length > 0
-            switchAlertVisibility(usernameAlert, usernameValid)
-        })
+            usernameValid = event.target.value.length > 0;
+            switchAlertVisibility(usernameAlert, usernameValid);
+        });
 
         document.getElementById("password").addEventListener("input", (event) => {
-            passwordValid = event.target.value.length > 0
-            switchAlertVisibility(passwordAlert, passwordValid)
-        })
+            passwordValid = event.target.value.length > 0;
+            switchAlertVisibility(passwordAlert, passwordValid);
+        });
 
         document.getElementById("login-btn").addEventListener("click", (event) => {
-            switchAlertVisibility(usernameAlert, usernameValid)
-            switchAlertVisibility(passwordAlert, passwordValid)
-            if (!usernameValid || !passwordValid) {
-                event.preventDefault()
+            event.preventDefault()
+            switchAlertVisibility(usernameAlert, usernameValid);
+            switchAlertVisibility(passwordAlert, passwordValid);
+            if (usernameValid && passwordValid) {
+                let loginForm = document.getElementById('login-form');
+                let password = loginForm.password.value;
+                let passwordEncode = new TextEncoder().encode(password);
+                let csrfCode = document.querySelector('input[name="gorilla.csrf.Token"]')?.value;
+                fetch('{{.Action}}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: loginForm.username.value,
+                        password: Array.from(passwordEncode),
+                        "gorilla.csrf.Token": csrfCode,
+                        then: loginForm.then.value,
+                    }),
+                    credentials: 'include',
+                });
             }
-        })
+        });
     </script>
 </body>
 
@@ -210,9 +227,6 @@ const (
 	<meta http-equiv="Expires" content="0">
 	<meta http-equiv="Pragma" content="no-cache">
 	<meta http-equiv="Cache-control" content="no-cache,no-store,must-revalidate">
-	<script>
-		globals = {'username': "{{.UserName}}"};
-	</script>
 	<style>
         body,html{margin:0;padding:0;font-size:14px;font-family:'Montserrat',sans-serif;box-sizing:border-box}
         input,button,.password-input-icon{outline:0;transition:all .2s cubic-bezier(0.645,0.045,0.355,1)}
@@ -281,7 +295,7 @@ const (
         <div class="form-block">
             <h3>初次修改密码</h3>
             <div class="prompt-line prompt-default prompt-info">为确保您的账户安全，初次登录后请修改密码</div>
-            <form id="confirm-form" autocomplete="off" action="{{.Action}}" method="POST">
+            <form id="confirm-form" autocomplete="off">
               <div class="error-placeholder">
                 {{ if .Error }}
                 <p class="pf-c-form__helper-text pf-m-error">
@@ -323,7 +337,7 @@ const (
                         </svg>
                     </span>
                     <input class="password-input" id="new-password" name="new_password" type="password" ` +
-		`oncopy="return false" autocomplete="off">
+		`autocomplete="off">
                 </div>
                 <div class="prompt-line prompt-default prompt-error">密码长度8~32位</div>
                 <div class="prompt-line prompt-default prompt-error">包含英文字母、数字、特殊字符` + "`" +
@@ -357,9 +371,8 @@ const (
                         </svg>
                     </span>
                     <input class="password-input" id="confirm-password" name="confirm-password" type="password" ` +
-		`oncopy="return false" autocomplete="off">
+		`autocomplete="off">
                 </div>
-                <div><input id="next" name="next" type="text" value="/" hidden readonly></div>
 				{{.CSRFToken}}
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden></div>
                 <div class="prompt-line prompt-default prompt-error">两次输入密码需要一致</div>
@@ -386,8 +399,9 @@ const (
             } else {
                 input.type = 'password';
             }
-        }
+        };
 
+        let username = "{{.UserName}}";
         let passwordValid1 = false;
         let passwordValid2 = false;
         let passwordValid3 = true;
@@ -405,13 +419,13 @@ const (
             } else {
                 btn.disabled = true;
             }
-        }
+        };
 
         const comparePassword = () => {
             const newPassword = document.getElementById("new-password").value;
             const confirmPassword = document.getElementById("confirm-password").value;
             return newPassword === confirmPassword;
-        }
+        };
 
         const switchPromptType = (prompt, testRes) => {
             if (testRes) {
@@ -421,11 +435,10 @@ const (
                 prompt.classList.remove("prompt-ok");
                 prompt.classList.add("prompt-error");
             }
-        }
+        };
 
         document.getElementById("new-password").addEventListener("input", (event) => {
             const newPassword = event.target.value;
-
             passwordValid1 = newPassword.length >= 8 && newPassword.length <= 32
             switchPromptType(prompt1, passwordValid1)
             passwordValid2 = /^(?=.*[0-9])(?=.*[A-Za-z])(?=.*[` + "`" +
@@ -433,64 +446,52 @@ const (
 		`~!@#$%^&*()\-_=+\\|\[{}\];:'",<.>/?]+$/.test(newPassword)
             switchPromptType(prompt2, passwordValid2)
             const reverseStr = (s) => s.split('').reverse().join('');
-            passwordValid3 = newPassword !== globals.username && newPassword !== reverseStr(globals.username)
-            switchPromptType(prompt3, passwordValid3)
-
-            confirmValid = comparePassword()
-            switchPromptType(prompt4, confirmValid)
-
-            updateConfirmBtn()
-        })
-
-        document.getElementById("confirm-password").addEventListener("input", () => {
-            confirmValid = comparePassword()
-            switchPromptType(prompt4, confirmValid)
-            updateConfirmBtn()
-        })
-
-        document.getElementById("confirm-form").addEventListener("submit", (event) => {
-            if (!passwordValid1 || !passwordValid2 || !passwordValid3 || !confirmValid) {
-                event.preventDefault()
-            }
-        })
-		
-		document.addEventListener('DOMContentLoaded', function () {
-            const cancelButton = document.querySelector('.cancel-btn');
-
-            cancelButton.addEventListener('click', function () {
-                sendDeleteRequest('{{.Action}}');
-            });
+            passwordValid3 = newPassword !== username && newPassword !== reverseStr(username);
+            switchPromptType(prompt3, passwordValid3);
+            confirmValid = comparePassword();
+            switchPromptType(prompt4, confirmValid);
+            updateConfirmBtn();
         });
 
-        function getCsrfToken() {
-            return document.querySelector('input[name="gorilla.csrf.Token"]').value;
-        }
+        document.getElementById("confirm-password").addEventListener("input", () => {
+            console.log(passwordValid1, passwordValid2, passwordValid3, confirmValid);
+            confirmValid = comparePassword();
+            switchPromptType(prompt4, confirmValid);
+            updateConfirmBtn();
+        });
 
-        function sendDeleteRequest(url) {
+        document.getElementById("confirm-btn").addEventListener("click", (event) => {
+            event.preventDefault();
+            if (passwordValid1 && passwordValid2 && passwordValid3 && confirmValid) {
+                let confirmForm = document.getElementById('confirm-form');
+                let newPassword = confirmForm.new_password.value;
+                let newPasswordEncode = new TextEncoder().encode(newPassword);
+                let csrfCode = document.querySelector('input[name="gorilla.csrf.Token"]')?.value;
+                fetch('{{.Action}}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        new_password: newPasswordEncode,
+                        "gorilla.csrf.Token": csrfCode,
+                        then: confirmForm.then.value,
+                    }),
+                    credentials: 'include',
+                });
+            }
+        });
+
+        document.getElementById('cancel-btn').addEventListener('click', (event) => {
+            let csrfCode = document.querySelector('input[name="gorilla.csrf.Token"]')?.value;
             fetch(url, {
                 method: 'DELETE',
                 headers: {
-                    'X-CSRF-Token': getCsrfToken()
+                    'X-CSRF-Token': csrfCode,
                 },
-                credentials: 'include' // 传递 cookies
-            })
-            .then(response => {
-                if (response.ok) {
-                    if (response.redirected) {
-                        window.location.href = response.url;
-                    } else {
-                        alert('首次修改密码成功');
-                    }
-                } else {
-                    // 请求失败后的操作
-                    alert('首次修改密码取消失败');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('请求出错');
+                credentials: 'include',
             });
-        }
+        });    
     </script>
 </body>
 
