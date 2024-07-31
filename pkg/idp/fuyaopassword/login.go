@@ -141,7 +141,7 @@ func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request
 
 	// fetch then from r
 	then := r.URL.Query().Get(constants.ThenParam)
-	if !isServerRelatedURL(then) {
+	if !isValidThenURL(then) {
 		http.Redirect(w, r, getConsoleServiceHost(r), http.StatusFound)
 		return
 	}
@@ -198,8 +198,8 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrUsernameOrPasswordMissing, then)
 		return
 	}
-	if len(then) == 0 {
-		then = "/"
+	if !isValidThenURL(then) {
+		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrInvalidThen, then)
 	}
 
 	// password confirmation logic
@@ -336,7 +336,7 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	then := r.URL.Query().Get(constants.ThenParam)
-	if !isServerRelatedURL(then) {
+	if !isValidThenURL(then) {
 		http.Redirect(w, r, getConsoleServiceHost(r), http.StatusFound)
 		return
 	}
@@ -376,8 +376,8 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrUsernameOrPasswordMissing, then)
 		return
 	}
-	if len(then) == 0 {
-		then = "/"
+	if !isValidThenURL(then) {
+		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrInvalidThen, then)
 	}
 	zlog.LogInfof("Login request from: Username: %s\n", username)
 

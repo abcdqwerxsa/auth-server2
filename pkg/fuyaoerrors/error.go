@@ -61,6 +61,9 @@ const (
 	// is not valid.
 	ErrStrIdentityProviderIncorrect = "the input identity_provider is not valid"
 
+	// ErrStrRedirectURIIncorrect represents the redirect_uri is invalid
+	ErrStrRedirectURIIncorrect = "the input redirect_uri is not valid"
+
 	// ErrStrTokenTypeUnrecognized represents an internal runtime error indicating the input token type is not valid.
 	ErrStrTokenTypeUnrecognized = "the input token type is not valid"
 
@@ -191,6 +194,9 @@ var (
 	// ErrIdentityProviderIncorrect represents an internal runtime error indicating that the input
 	// identity_provider is not valid.
 	ErrIdentityProviderIncorrect = errors.New(ErrStrIdentityProviderIncorrect)
+
+	// ErrRedirectURIIncorrect represents redirect_uri is not valid
+	ErrRedirectURIIncorrect = errors.New(ErrStrRedirectURIIncorrect)
 
 	// ErrTokenTypeUnrecognized represents an internal runtime error indicating that the input token type is not valid.
 	ErrTokenTypeUnrecognized = errors.New(ErrStrTokenTypeUnrecognized)
