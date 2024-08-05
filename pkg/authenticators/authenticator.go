@@ -14,6 +14,7 @@
 package authenticators
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -36,9 +37,9 @@ import (
 
 // PasswordAuthenticator in an authenticator that uses username/password to verify identities
 type PasswordAuthenticator interface {
-	AuthenticatePassword(ctx context.Context, username, password string) (*authenticator.Response, bool, error)
-	ResetPassword(ctx context.Context, username, oldPassword, newPassword string) error
-	ConfirmPassword(ctx context.Context, username, newPassword string) error
+	AuthenticatePassword(ctx context.Context, username string, password []byte) (*authenticator.Response, bool, error)
+	ResetPassword(ctx context.Context, username string, oldPassword, newPassword []byte) error
+	ConfirmPassword(ctx context.Context, username string, newPassword []byte) error
 }
 
 // FuyaoPasswordAuthenticator is the default password authenticator for fuyao-oauth-server
@@ -60,7 +61,7 @@ func NewFuyaoPasswordAuthenticator(k8sClient kubernetes.Interface, namespace str
 // AuthenticatePassword authenticates the password
 func (a *FuyaoPasswordAuthenticator) AuthenticatePassword(
 	ctx context.Context,
-	username, passwd string,
+	username string, passwd []byte,
 ) (*authenticator.Response, bool, error) {
 	// fetch old password
 	userinfo, base64EncryptedPassword, err := a.fetchUserInfoAndStoredPassword(username)
@@ -72,11 +73,11 @@ func (a *FuyaoPasswordAuthenticator) AuthenticatePassword(
 	if ok, err := a.encryptor.VerifyPassword(passwd, base64EncryptedPassword); !ok || err != nil {
 		return nil, false, err
 	}
-
+	zlog.LogInfo("verify password succeed")
 	return &authenticator.Response{User: userinfo}, true, nil
 }
 
-func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, passwd string) bool {
+func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username string, passwd []byte) bool {
 	// check password length
 	if len(passwd) < constants.PasswordMinLen || len(passwd) > constants.PasswordMaxLen {
 		zlog.LogError("the password length should lie between 8 and 32")
@@ -89,15 +90,15 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username, passwd st
 	reDigit := regexp.MustCompile(`[0-9]`)
 	reSpecialChar := regexp.MustCompile(`[!\"#$%&'()*+,-./:;<=>?@[\]^_{|}~ ]`)
 
-	if (!reUpperCase.MatchString(passwd) && !reLowerCase.MatchString(passwd)) || !reDigit.MatchString(passwd) ||
-		!reSpecialChar.MatchString(passwd) {
+	if (!reUpperCase.Match(passwd) && !reLowerCase.Match(passwd)) || !reDigit.Match(passwd) ||
+		!reSpecialChar.Match(passwd) {
 		zlog.LogError("password must contain at least one lowercase letter or one uppercase letter, " +
 			"one number, and one special character")
 		return false
 	}
 
 	// check whether the password is contained in username / reversed username
-	if passwd == username || passwd == reverseString(username) {
+	if isByteSameAsString(passwd, username) || isByteSameAsString(passwd, reverseString(username)) {
 		zlog.LogError("password cannot be the same as the account number or the reverse account number")
 		return false
 	}
@@ -113,18 +114,23 @@ func reverseString(s string) string {
 	return reversed
 }
 
-func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username string) (user.Info, string, error) {
+func isByteSameAsString(passwd []byte, username string) bool {
+	byteUserName := []byte(username)
+	return bytes.Equal(passwd, byteUserName)
+}
+
+func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username string) (user.Info, []byte, error) {
 	// get the secret
 	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
 	if err != nil {
 		zlog.LogErrorf("cannot get the password secret for %s, err: %v", username, err)
-		return nil, "", fuyaoerrors.ErrPasswordAuthenticationFailed
+		return nil, nil, fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
 	// fetch encrypted password
-	base64EncryptedPassword, err := readStringFromSecretData(secret.Data, "encrypted-password")
+	base64EncryptedPassword, err := readBytesFromSecretData(secret.Data, "encrypted-password")
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	// prepare userinfo
@@ -133,22 +139,22 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 	userinfo.UID = string(secret.UID)
 	groups, err := readStringFromSecretData(secret.Data, "groups")
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 	if groups != "" {
 		userinfo.Groups = strings.Split(groups, ",")
 	}
 	extra, err := readExtraFromSecretData(secret.Data, "extra")
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 	firstLoginField, ok := extra[constants.UserFirstLogin]
 	if !ok {
-		return nil, "", fuyaoerrors.ErrLoginServiceDown
+		return nil, nil, fuyaoerrors.ErrLoginServiceDown
 	}
 	firstLogin := firstLoginField[0]
 	if firstLogin != "true" && firstLogin != "false" {
-		return nil, "", fuyaoerrors.ErrLoginServiceDown
+		return nil, nil, fuyaoerrors.ErrLoginServiceDown
 	}
 	userinfo.Extra = make(map[string][]string)
 	userinfo.Extra[constants.UserFirstLogin] = []string{firstLogin}
@@ -164,6 +170,16 @@ func readStringFromSecretData(secretData map[string][]byte, key string) (string,
 	}
 
 	return string(base64Data), nil
+}
+
+func readBytesFromSecretData(secretData map[string][]byte, key string) ([]byte, error) {
+	base64Data, ok := secretData[key]
+	if !ok {
+		zlog.LogErrorf("the base64 secretData %s is missing in the secret", key)
+		return nil, fuyaoerrors.ErrLoginServiceDown
+	}
+
+	return base64Data, nil
 }
 
 func readExtraFromSecretData(secretData map[string][]byte, key string) (map[string][]string, error) {
@@ -183,7 +199,7 @@ func readExtraFromSecretData(secretData map[string][]byte, key string) (map[stri
 	return extra, err
 }
 
-func (a *FuyaoPasswordAuthenticator) savePassword(username, passwd string, firstLogin bool) error {
+func (a *FuyaoPasswordAuthenticator) savePassword(username string, passwd []byte, firstLogin bool) error {
 	// get the secret
 	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
 	if err != nil {
@@ -213,7 +229,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, passwd string, first
 	}
 
 	// set new password
-	secret.Data["encrypted-password"] = []byte(encryptedPassword)
+	secret.Data["encrypted-password"] = encryptedPassword
 	extra[constants.UserFirstLogin][0] = "false"
 	byteExtra, err := json.Marshal(extra)
 	if err != nil {
@@ -233,7 +249,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username, passwd string, first
 }
 
 // ConfirmPassword is used when the user first logins in
-func (a *FuyaoPasswordAuthenticator) ConfirmPassword(ctx context.Context, username, newPassword string) error {
+func (a *FuyaoPasswordAuthenticator) ConfirmPassword(ctx context.Context, username string, newPassword []byte) error {
 	// 提取旧的加密密码
 	_, base64EncryptedOldPassword, err := a.fetchUserInfoAndStoredPassword(username)
 	if err != nil {
@@ -265,10 +281,10 @@ func (a *FuyaoPasswordAuthenticator) ConfirmPassword(ctx context.Context, userna
 // ResetPassword modifies the user password
 func (a *FuyaoPasswordAuthenticator) ResetPassword(
 	ctx context.Context,
-	username, oldPassword, newPassword string,
+	username string, oldPassword, newPassword []byte,
 ) error {
 	// 新旧密码不能相同
-	if oldPassword == newPassword {
+	if bytes.Equal(oldPassword, newPassword) {
 		return fuyaoerrors.ErrPasswordSame
 	}
 
@@ -302,8 +318,8 @@ func (a *FuyaoPasswordAuthenticator) ResetPassword(
 
 // Encryptor manages the encrypt and decrypt funcs & config
 type Encryptor interface {
-	VerifyPassword(newPassword, encryptedOldPassword string) (bool, error)
-	EncryptPassword(rawPassword string) (string, error)
+	VerifyPassword(newPassword, encryptedOldPassword []byte) (bool, error)
+	EncryptPassword(rawPassword []byte) ([]byte, error)
 }
 
 // PBKDF2Encryptor is the encryptor + decryptor using PBKDF2 algorithm
@@ -325,40 +341,40 @@ func NewPBKDF2Encryptor() *PBKDF2Encryptor {
 }
 
 // EncryptPassword encrypts the password
-func (e *PBKDF2Encryptor) EncryptPassword(rawPassword string) (string, error) {
+func (e *PBKDF2Encryptor) EncryptPassword(rawPassword []byte) ([]byte, error) {
 	// 生成随机的盐值
 	salt := make([]byte, e.saltLength)
 	_, err := rand.Read(salt)
 	if err != nil {
-		return "", fuyaoerrors.ErrLoginServiceDown
+		return nil, fuyaoerrors.ErrLoginServiceDown
 	}
 
 	// 使用 PBKDF2 算法生成密文
-	encryptedPassword := pbkdf2.Key([]byte(rawPassword), salt, e.iterations, e.keyLength, e.encryptMethod)
+	encryptedPassword := pbkdf2.Key(rawPassword, salt, e.iterations, e.keyLength, e.encryptMethod)
 
 	// 将盐值和密文合并并编码为 Base64 字符串
 	encryptedData := append(salt, encryptedPassword...)
-	encryptedPasswordBase64 := base64.StdEncoding.EncodeToString(encryptedData)
+	encryptedData = []byte(base64.StdEncoding.EncodeToString(encryptedData))
 
 	// 返回加密后的密码
-	return encryptedPasswordBase64, nil
+	return encryptedData, nil
 }
 
 // VerifyPassword checks whether the rawPassword can be encrypted to the stored encryptedPassword
-func (e *PBKDF2Encryptor) VerifyPassword(rawPassword, encryptedPassword string) (bool, error) {
+func (e *PBKDF2Encryptor) VerifyPassword(rawPassword, encryptedPassword []byte) (bool, error) {
 	// decode加密后的密码
-	encryptedData, err := base64.StdEncoding.DecodeString(encryptedPassword)
+	encryptedPassword, err := base64.StdEncoding.DecodeString(string(encryptedPassword))
 	if err != nil {
 		return false, fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
 	// 提取盐值和密文
-	salt := encryptedData[:e.saltLength]
-	encryptedPasswordBytes := encryptedData[e.saltLength:]
+	salt := encryptedPassword[:e.saltLength]
+	encryptedPasswordBytes := encryptedPassword[e.saltLength:]
 
 	// 使用相同的盐值和加密算法对原始密码进行加密
-	newEncryptedPassword := pbkdf2.Key([]byte(rawPassword), salt, e.iterations, e.keyLength, e.encryptMethod)
+	newEncryptedPassword := pbkdf2.Key(rawPassword, salt, e.iterations, e.keyLength, e.encryptMethod)
 
 	// 比较加密后的密码是否相同
-	return string(encryptedPasswordBytes) == string(newEncryptedPassword), nil
+	return bytes.Equal(encryptedPasswordBytes, newEncryptedPassword), nil
 }
