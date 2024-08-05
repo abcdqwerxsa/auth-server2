@@ -201,15 +201,20 @@ const (
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                    	'X-CSRF-Token': csrfCode,
                     },
                     body: JSON.stringify({
                         username: loginForm.username.value,
                         password: Array.from(passwordEncode),
-                        "gorilla.csrf.Token": csrfCode,
                         then: loginForm.then.value,
                     }),
                     credentials: 'include',
-                });
+                })
+				.then(response => {
+					if (response.ok) {
+						window.location.href = response.url;
+					}
+				});
             }
         });
     </script>
@@ -377,7 +382,7 @@ const (
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden></div>
                 <div class="prompt-line prompt-default prompt-error">两次输入密码需要一致</div>
                 <div class="btn-block">
-					<button class="cancel-btn" type="button"><span>取消</span></button>
+					<button id="cancel-btn" class="cancel-btn" type="button"><span>取消</span></button>
                     <button id="confirm-btn" type="submit" class="btn-primary confirm-btn"
                         formnovalidate><span>确认</span></button>
                 </div>
@@ -471,25 +476,33 @@ const (
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                    	'X-CSRF-Token': csrfCode,
                     },
                     body: JSON.stringify({
-                        new_password: newPasswordEncode,
-                        "gorilla.csrf.Token": csrfCode,
+                        new_password: Array.from(newPasswordEncode),
                         then: confirmForm.then.value,
                     }),
                     credentials: 'include',
-                });
+                })
+				.then(confirmResponse => {
+					if (confirmResponse.ok) {
+						window.location.href = confirmResponse.url;
+					}
+				});
             }
         });
 
         document.getElementById('cancel-btn').addEventListener('click', (event) => {
             let csrfCode = document.querySelector('input[name="gorilla.csrf.Token"]')?.value;
-            fetch(url, {
+            fetch('{{.Action}}', {
                 method: 'DELETE',
                 headers: {
                     'X-CSRF-Token': csrfCode,
                 },
                 credentials: 'include',
+            })
+			.then(response => {
+				window.location.href = response.url;
             });
         });    
     </script>

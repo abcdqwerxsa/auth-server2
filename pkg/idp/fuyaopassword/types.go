@@ -15,13 +15,20 @@ package fuyaopassword
 
 // PasswordConfirmRequest is the json struct for password confirmation
 type PasswordConfirmRequest struct {
-	NewPassword string `json:"new_password"`
+	NewPassword []byte `json:"new_password"`
 	Then        string `json:"then"`
 }
 
 // PasswordResetRequest is the json struct for password reset
 type PasswordResetRequest struct {
 	Username         string `json:"username"`
-	OriginalPassword string `json:"original_password"`
-	NewPassword      string `json:"new_password"`
+	OriginalPassword []byte `json:"original_password"`
+	NewPassword      []byte `json:"new_password"`
+}
+
+// LoginRequest is the json struct for logging in
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password []byte `json:"password"`
+	Then     string `json:"then"`
 }

@@ -190,9 +190,18 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newPassword := r.FormValue(constants.NewPasswordParam)
-	then := r.FormValue(constants.ThenParam)
-	if len(newPassword) == 0 {
+	// read params from r.url
+	var requestBody PasswordConfirmRequest
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		zlog.LogErrorf("Password Confirm failed, error: %v", err)
+		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
+		return
+	}
+
+	byteNewPassword := requestBody.NewPassword
+	then := requestBody.Then
+	defer destroyBytes(byteNewPassword)
+	if len(byteNewPassword) == 0 {
 		zlog.LogErrorf("Password confirmation fail for user %s, err: %v", username,
 			fuyaoerrors.ErrUsernameOrPasswordMissing)
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrUsernameOrPasswordMissing, then)
@@ -203,7 +212,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// password confirmation logic
-	if err := l.Authenticator.ConfirmPassword(context.Background(), username, newPassword); err != nil {
+	if err := l.Authenticator.ConfirmPassword(context.Background(), username, byteNewPassword); err != nil {
 		zlog.LogErrorf("Password confirmation fail for user %s, err: %v", username, err)
 		redirectGetMethodWithError(w, r, err.Error(), then)
 		return
@@ -277,15 +286,17 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	username := requestBody.Username
-	oldPassword := requestBody.OriginalPassword
-	newPassword := requestBody.NewPassword
-	if len(username) == 0 || len(oldPassword) == 0 || len(newPassword) == 0 {
+	byteOldPassword := requestBody.OriginalPassword
+	byteNewPassword := requestBody.NewPassword
+	defer destroyBytes(byteOldPassword)
+	defer destroyBytes(byteNewPassword)
+	if len(username) == 0 || len(byteOldPassword) == 0 || len(byteNewPassword) == 0 {
 		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrUsernameOrPasswordMissing)
 		return
 	}
 
-	if err := l.Authenticator.ResetPassword(context.Background(), username, oldPassword, newPassword); err != nil {
+	if err := l.Authenticator.ResetPassword(context.Background(), username, byteOldPassword, byteNewPassword); err != nil {
 		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
 		return
@@ -366,13 +377,20 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
-	// fetch form value
-	username := r.FormValue(constants.UsernameParam)
-	password := r.FormValue(constants.PasswordParam)
-	then := r.FormValue(constants.ThenParam)
+	// read params from r.url
+	var requestBody LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		zlog.LogErrorf("Login failed, error: %v", err)
+		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
+		return
+	}
+	username := requestBody.Username
+	bytePassword := requestBody.Password
+	defer destroyBytes(bytePassword)
+	then := requestBody.Then
 
 	// check form value
-	if len(username) == 0 || len(password) == 0 {
+	if len(username) == 0 || len(bytePassword) == 0 {
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrUsernameOrPasswordMissing, then)
 		return
 	}
@@ -393,7 +411,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// verify the password
-	response, ok, err := l.Authenticator.AuthenticatePassword(context.Background(), username, password)
+	response, ok, err := l.Authenticator.AuthenticatePassword(context.Background(), username, bytePassword)
 
 	// service internal error
 	if err != nil && !errors.Is(err, fuyaoerrors.ErrPasswordAuthenticationFailed) {
@@ -495,6 +513,12 @@ func getIPAddress(r *http.Request) string {
 	}
 
 	return ip
+}
+
+func destroyBytes(bt []byte) {
+	for i := range bt {
+		bt[i] = 0
+	}
 }
 
 func isServerRelatedURL(uri string) bool {
