@@ -16,6 +16,9 @@ spec:
         application: "oauth-server"
     spec:
       serviceAccountName: oauth-server
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
       containers:
         - name: oauth-server
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
