@@ -459,6 +459,8 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		return
 	}
 	delete(s.oauthProxyStore, oauthServerSessionID)
+	// flush the gorilla.csrf
+	clearCSRFCookie(w)
 	zlog.LogInfof("Logout succeed for user")
 
 	// no content to return
@@ -537,4 +539,16 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	}
 
 	return
+}
+
+func clearCSRFCookie(w http.ResponseWriter) {
+	cookie := &http.Cookie{
+		Name:    "_gorilla_csrf",
+		Value:   "",
+		Path:    "/",             // cookie的有效路径
+		Expires: time.Unix(0, 0), // 过期时间设置为Unix时间戳0，即过去的时间
+	}
+
+	// 将cookie设置到HTTP响应头中
+	http.SetCookie(w, cookie)
 }
