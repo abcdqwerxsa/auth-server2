@@ -107,7 +107,7 @@ func NewHttpServer(options *ServerOptions) (*http.Server, error) {
 		// configure the tls
 		server.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{certificate},
-			ClientAuth:   tls.RequestClientCert,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
 			MinVersion:   tls.VersionTLS12,
 			ClientCAs:    caCertPool,
 		}
