@@ -264,22 +264,13 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// add an access token validation, since all the services are required to expose in this version
-	accessToken, err := l.getAccessToken(r)
-	if err != nil {
-		zlog.LogErrorf("Password Reset failed, error: %v", err)
-		httpserver.RespondWithStatusMsg(w, http.StatusUnauthorized, 0, fuyaoerrors.ErrStrNotLogin)
+	if !l.webhookAuthentication(w, r) {
 		return
-	}
-
-	loggedIn, err := l.authenticateByWebhook(accessToken)
-	if !loggedIn || err != nil {
-		zlog.LogErrorf("Password Reset failed, error: %v", err)
-		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
 	}
 
 	// read params from r.url
 	var requestBody PasswordResetRequest
-	if err = json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
 		return
@@ -291,13 +282,26 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	defer destroyBytes(byteOldPassword)
 	defer destroyBytes(byteNewPassword)
 	if len(username) == 0 || len(byteOldPassword) == 0 || len(byteNewPassword) == 0 {
-		zlog.LogErrorf("Password Reset failed, error: %v", err)
+		zlog.LogErrorf("Password Reset failed, error: %v", fuyaoerrors.ErrUsernameOrPasswordMissing)
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrUsernameOrPasswordMissing)
 		return
 	}
 
+	ipAddress := getIPAddress(r)
+	zlog.LogInfof("Password reset from %s", ipAddress)
+
 	if err := l.Authenticator.ResetPassword(context.Background(), username, byteOldPassword, byteNewPassword); err != nil {
 		zlog.LogErrorf("Password Reset failed, error: %v", err)
+		// add failed records and check blocking
+		if errors.Is(err, fuyaoerrors.ErrPasswordResetFailed) {
+			blocked, errString := l.checkForIPBlocking(ipAddress)
+			if blocked {
+				httpserver.RespondWithStatusMsg(w, http.StatusFound, 0, errString)
+			} else {
+				httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, errString)
+			}
+			return
+		}
 		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
 		return
 	}
@@ -305,6 +309,23 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 
 	httpserver.RespondWithStatusMsg(w, http.StatusOK, 0, "Password Reset OK")
 	return
+}
+
+func (l *Login) webhookAuthentication(w http.ResponseWriter, r *http.Request) bool {
+	accessToken, err := l.getAccessToken(r)
+	if err != nil {
+		zlog.LogErrorf("Password Reset failed, error: %v", err)
+		httpserver.RespondWithStatusMsg(w, http.StatusUnauthorized, 0, fuyaoerrors.ErrStrNotLogin)
+		return false
+	}
+
+	loggedIn, err := l.authenticateByWebhook(accessToken)
+	if !loggedIn || err != nil {
+		zlog.LogErrorf("Password Reset failed, error: %v", err)
+		httpserver.RespondWithStatusMsg(w, fuyaoerrors.ErrStatusCode[err], 0, err.Error())
+		return false
+	}
+	return true
 }
 
 func (l *Login) getAccessToken(r *http.Request) (string, error) {
@@ -380,7 +401,6 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// read params from r.url
 	var requestBody LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
-		zlog.LogErrorf("Login failed, error: %v", err)
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
 		return
 	}
@@ -396,12 +416,12 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !isValidThenURL(then) {
 		redirectGetMethodWithError(w, r, fuyaoerrors.ErrStrInvalidThen, then)
+		return
 	}
-	zlog.LogInfof("Login request from: Username: %s\n", username)
 
 	// login devastation check
 	ipAddress := getIPAddress(r)
-	zlog.LogInfof("Login from %s", ipAddress)
+	zlog.LogInfof("Login request from %s: Username: %s\n", ipAddress, username)
 	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
 		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
 			strconv.FormatInt(remainingTime, constants.Decimal), 1)
@@ -422,7 +442,8 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// password authentication error
 	if !ok {
-		l.checkForIPBlocking(w, r, ipAddress, then)
+		_, errString := l.checkForIPBlocking(ipAddress)
+		redirectGetMethodWithError(w, r, errString, then)
 		return
 	}
 
@@ -446,7 +467,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, then, http.StatusFound)
 }
 
-func (l *Login) checkForIPBlocking(w http.ResponseWriter, r *http.Request, ipAddress string, then string) {
+func (l *Login) checkForIPBlocking(ipAddress string) (bool, string) {
 	// current ip failed times +1
 	remainingAttempt := l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
 
@@ -455,8 +476,7 @@ func (l *Login) checkForIPBlocking(w http.ResponseWriter, r *http.Request, ipAdd
 		errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedWithCount, "%s",
 			strconv.FormatInt(int64(remainingAttempt), constants.Decimal), 1)
 		zlog.LogErrorf("Login request fail, error: %s", errString)
-		redirectGetMethodWithError(w, r, errString, then)
-		return
+		return false, errString
 	}
 
 	// trigger ip blocking
@@ -464,8 +484,7 @@ func (l *Login) checkForIPBlocking(w http.ResponseWriter, r *http.Request, ipAdd
 	errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedLocked, "%s",
 		strconv.FormatInt(lockDuration, constants.Decimal), 1)
 	zlog.LogErrorf("Login request fail and trigger ip blocking for %s", ipAddress)
-	redirectGetMethodWithError(w, r, errString, then)
-	return
+	return true, errString
 }
 
 func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) error {

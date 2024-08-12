@@ -19,6 +19,7 @@ spec:
       securityContext:
         runAsUser: 65532
         runAsGroup: 65532
+        fsGroup: 65532
       containers:
         - name: oauth-server
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -61,15 +62,19 @@ spec:
       volumes:
         {{- if .Values.config.httpServerConfig.enableHttps }}
         - name: oauth-serving-ca
-          configMap:
-            name: oauth-server-serving-ca
+          secret:
+            defaultMode: 0600
+            secretName: oauth-server-serving-ca
         - name: oauth-server-server
           secret:
+            defaultMode: 0600
             secretName: oauth-server-server
         {{- end }}
         - name: config-volume
           configMap:
+            defaultMode: 0600
             name: oauth-server-config
         - name: oauth-jwt-cookie-secret
           secret:
+            defaultMode: 0600
             secretName: oauth-jwt-cookie-secret
