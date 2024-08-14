@@ -88,7 +88,7 @@ func (a *FuyaoPasswordAuthenticator) checkPasswordComplexity(username string, pa
 	reUpperCase := regexp.MustCompile(`[A-Z]`)
 	reLowerCase := regexp.MustCompile(`[a-z]`)
 	reDigit := regexp.MustCompile(`[0-9]`)
-	reSpecialChar := regexp.MustCompile(`[!\"#$%&'()*+,-./:;<=>?@[\]^_{|}~ ]`)
+	reSpecialChar := regexp.MustCompile(`[\x60!\"#$%&'()*+,-./:;<=>?@[\\^\]_{|}~ ]`)
 
 	if (!reUpperCase.Match(passwd) && !reLowerCase.Match(passwd)) || !reDigit.Match(passwd) ||
 		!reSpecialChar.Match(passwd) {
