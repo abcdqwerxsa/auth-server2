@@ -13,20 +13,19 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-    # 此处可以根据需要添加其他权限配置，如对 ConfigMap 的权限等
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: oauth-user-rolebinding
-  namespace: oauth-user  # RoleBinding 所属的命名空间，这里假设为 oauth-server
+  namespace: oauth-user
 subjects:
   - kind: ServiceAccount
-    name: oauth-server  # 绑定到的 ServiceAccount 名称，这里假设为 oauth-server
-    namespace: fuyao-oauth  # ServiceAccount 所属的命名空间，这里假设为 oauth-server
+    name: oauth-server
+    namespace: fuyao-oauth
 roleRef:
   kind: Role
-  name: oauth-user-role  # 引用的 Role 名称
+  name: oauth-user-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -38,20 +37,43 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-    # 此处可以根据需要添加其他权限配置，如对 ConfigMap 的权限等
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: oauth-code-token-rolebinding
-  namespace: oauth-code-token  # RoleBinding 所属的命名空间，这里假设为 oauth-server
+  namespace: oauth-code-token
 subjects:
   - kind: ServiceAccount
-    name: oauth-server  # 绑定到的 ServiceAccount 名称，这里假设为 oauth-server
-    namespace: fuyao-oauth  # ServiceAccount 所属的命名空间，这里假设为 oauth-server
+    name: oauth-server
+    namespace: fuyao-oauth
 roleRef:
   kind: Role
-  name: oauth-code-token-role  # 引用的 Role 名称
+  name: oauth-code-token-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jwt-cookie-read-role
+  namespace: fuyao-oauth
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jwt-cookie-read-rolebinding
+  namespace: fuyao-oauth
+subjects:
+  - kind: ServiceAccount
+    name: oauth-server
+    namespace: fuyao-oauth
+roleRef:
+  kind: Role
+  name: jwt-cookie-read-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1

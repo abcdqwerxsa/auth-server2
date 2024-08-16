@@ -32,7 +32,7 @@ func TestPBKDF2EncryptorEncryptPassword(t *testing.T) {
 
 	encryptor := &PBKDF2Encryptor{
 		saltLength:    16,
-		iterations:    10000,
+		iterations:    100000,
 		keyLength:     64,
 		encryptMethod: sha256.New,
 	}
@@ -73,7 +73,7 @@ func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 
 	encryptor := &PBKDF2Encryptor{
 		saltLength:    16,
-		iterations:    10000,
+		iterations:    100000,
 		keyLength:     64,
 		encryptMethod: sha256.New,
 	}
@@ -135,7 +135,7 @@ func TestNewPBKDF2Encryptor(t *testing.T) {
 			"successfully tested",
 			&PBKDF2Encryptor{
 				saltLength:    16,
-				iterations:    10000,
+				iterations:    100000,
 				keyLength:     64,
 				encryptMethod: sha256.New,
 			},
@@ -197,7 +197,7 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	encryptor := &PBKDF2Encryptor{
 		saltLength:    16,
-		iterations:    10000,
+		iterations:    100000,
 		keyLength:     64,
 		encryptMethod: sha256.New,
 	}
@@ -324,7 +324,7 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 	fakeClient := fake.NewSimpleClientset(testUserSecret)
 	encryptor := &PBKDF2Encryptor{
 		saltLength:    16,
-		iterations:    10000,
+		iterations:    100000,
 		keyLength:     64,
 		encryptMethod: sha256.New,
 	}

@@ -96,7 +96,7 @@ func NewOAuthServer(
 	// auth code and jwt access token generator
 	manager.MapAuthorizeGenerate(generators.NewFuyaoAuthorizeGenerate())
 	manager.MapAccessGenerate(
-		generates.NewJWTAccessGenerate([]byte(cfg.JWTPrivateKey), jwt.SigningMethodHS512))
+		generates.NewJWTAccessGenerate(cfg.JWTPrivateKey, jwt.SigningMethodHS512))
 
 	// storage
 	clientStore := store.NewClientStore()

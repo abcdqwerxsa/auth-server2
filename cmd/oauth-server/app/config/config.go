@@ -179,8 +179,8 @@ func (i *IPProtectorConfig) Validate() []error {
 type IDPLoginStoreConfig struct {
 	SessionName   string `json:"SessionName"`
 	SessionMaxAge int    `json:"SessionMaxAge"`
-	SigningKey    string `json:"SigningKey"`
-	EncryptionKey string `json:"EncryptionKey"`
+	SigningKey    []byte `json:"SigningKey"`
+	EncryptionKey []byte `json:"EncryptionKey"`
 }
 
 func newIDPLoginStoreConfig() *IDPLoginStoreConfig {
@@ -202,11 +202,11 @@ func (s *IDPLoginStoreConfig) Validate() []error {
 		zlog.LogWarn("the session-cookie will not expire")
 	}
 
-	if s.SigningKey == "" {
+	if s.SigningKey == nil {
 		zlog.LogWarn("no signing key is provided to store the idp login state cookie")
 	}
 
-	if s.EncryptionKey == "" {
+	if s.EncryptionKey == nil {
 		zlog.LogWarn("no encryption key is provided to store the idp login state cookie")
 	}
 
@@ -221,7 +221,7 @@ type OAuthServerConfig struct {
 	RefreshTokenExp    time.Duration     `json:"RefreshTokenExp"`
 	IsGenerateRefresh  bool              `json:"IsGenerateRefresh"`
 	JWTKeyID           string            `json:"JWTKeyID"`
-	JWTPrivateKey      string            `json:"JWTPrivateKey"`
+	JWTPrivateKey      []byte            `json:"JWTPrivateKey"`
 	ClientMapper       map[string]string `json:"ClientMapper"`
 }
 
@@ -271,7 +271,7 @@ func (o *OAuthServerConfig) Validate() []error {
 		zlog.LogWarn("the key id for JWT header is not provided")
 	}
 
-	if o.JWTPrivateKey == "" {
+	if o.JWTPrivateKey == nil {
 		zlog.LogError(fuyaoerrors.ErrStrJWTPrivateKeyMissing)
 		errs = append(errs, fuyaoerrors.ErrJWTPrivateKeyMissing)
 	}

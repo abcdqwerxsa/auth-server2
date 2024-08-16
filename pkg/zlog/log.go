@@ -31,7 +31,7 @@ const (
 	defaultConfigPath = "/etc/oauth-server"
 	defaultConfigName = "oauth-server"
 	defaultConfigType = "yaml"
-	defaultLogPath    = "/var/log"
+	defaultLogPath    = "/var/log/oauth-server"
 )
 
 // Logger is the overall logging component
@@ -88,13 +88,13 @@ func getDefaultConf() *LogConfig {
 		Level:       "info",
 		EncoderType: "console",
 		Path:        defaultLogPath,
-		FileName:    "root.log",
+		FileName:    "oauth-server.log",
 		MaxSize:     20,
 		MaxBackups:  0,
 		MaxAge:      7,
 		LocalTime:   false,
 		Compress:    true,
-		OutMod:      "console",
+		OutMod:      "both",
 	}
 	exePath, err := os.Executable()
 	if err != nil {
