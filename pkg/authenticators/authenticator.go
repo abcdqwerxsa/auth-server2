@@ -334,7 +334,7 @@ type PBKDF2Encryptor struct {
 func NewPBKDF2Encryptor() *PBKDF2Encryptor {
 	return &PBKDF2Encryptor{
 		saltLength:    16,
-		iterations:    10000,
+		iterations:    100000,
 		keyLength:     64,
 		encryptMethod: sha256.New,
 	}

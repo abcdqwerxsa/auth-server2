@@ -14,13 +14,22 @@
 package options
 
 import (
+	"context"
 	"encoding/base64"
+
 	"github.com/spf13/viper"
-	"openfuyao/oauth-server/pkg/zlog"
-	"os"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	k8sconfig "openfuyao/oauth-server/pkg/config"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
+	"openfuyao/oauth-server/pkg/zlog"
+)
+
+const (
+	secretNamespace = "fuyao-oauth"
+	secretName      = "oauth-jwt-cookie-secret"
 )
 
 // OAuthServerOption stores the overall configfile and its loading method for the whole oauthserver service
@@ -55,20 +64,23 @@ func (o *OAuthServerOption) ReadConfig() (*config.OAuthServerAPIServerConfig, er
 		return nil, err
 	}
 
+	// oAuthServerConfig.K8sConfig is allowed to be nil since we will read from incluster config / default path
+	k8sClient := k8sconfig.GetKubernetesClient(oAuthServerConfig.K8sConfig)
+
 	// manually add secret keys
-	jwtPrivateKeyDecoded, err := readFromSecret("/oauth-jwt.key")
+	jwtPrivateKeyDecoded, err := readDataFromK8sSecret(k8sClient, "oauth-jwt.key")
 	if err != nil {
 		return nil, err
 	}
 	oAuthServerConfig.OAuthServerConfig.JWTPrivateKey = jwtPrivateKeyDecoded
 
-	signKeyDecoded, err := readFromSecret("/oauth-cookie-sign.key")
+	signKeyDecoded, err := readDataFromK8sSecret(k8sClient, "oauth-cookie-sign.key")
 	if err != nil {
 		return nil, err
 	}
 	oAuthServerConfig.IDPLoginStoreConfig.SigningKey = signKeyDecoded
 
-	encryptKeyDecoded, err := readFromSecret("/oauth-cookie-encrypt.key")
+	encryptKeyDecoded, err := readDataFromK8sSecret(k8sClient, "oauth-cookie-encrypt.key")
 	if err != nil {
 		return nil, err
 	}
@@ -78,18 +90,22 @@ func (o *OAuthServerOption) ReadConfig() (*config.OAuthServerAPIServerConfig, er
 
 }
 
-func readFromSecret(filePath string) (string, error) {
-	b64Key, err := os.ReadFile(filePath)
+func readDataFromK8sSecret(k8sClient kubernetes.Interface, key string) ([]byte, error) {
+	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, v1.GetOptions{})
 	if err != nil {
-		zlog.LogErrorf("read secret failed")
-		return "", err
+		return nil, err
 	}
 
-	keyDecoded, err := base64.StdEncoding.DecodeString(string(b64Key))
-	if err != nil {
-		zlog.LogWarnf("Error decoding base64: %v, use it directly", err)
-		return string(b64Key), err
-	} else {
-		return string(keyDecoded), err
+	b64Data := secret.Data[key]
+	if b64Data == nil {
+		zlog.LogErrorf("cannot load data from jwt-cookie")
+		return nil, fuyaoerrors.ErrFailToGetSecret
 	}
+
+	rawData, err := base64.StdEncoding.DecodeString(string(b64Data))
+	if err != nil {
+		return nil, err
+	}
+
+	return rawData, nil
 }

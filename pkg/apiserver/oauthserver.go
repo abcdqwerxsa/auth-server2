@@ -15,9 +15,9 @@ package apiserver
 
 import (
 	"context"
-	"github.com/gorilla/csrf"
 	"net/http"
 
+	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
 
 	overallconfigs "openfuyao/oauth-server/cmd/oauth-server/app/config"
@@ -58,7 +58,7 @@ func NewOAuthServerAPIServer(
 	k8sClient := config.GetKubernetesClient(cfg.K8sConfig)
 	idpLoginStore := sessions.NewSessionStore(
 		cfg.IDPLoginStoreConfig.SessionName, cfg.IDPLoginStoreConfig.SessionMaxAge,
-		[]byte(cfg.IDPLoginStoreConfig.SigningKey), []byte(cfg.IDPLoginStoreConfig.EncryptionKey))
+		cfg.IDPLoginStoreConfig.SigningKey, cfg.IDPLoginStoreConfig.EncryptionKey)
 	loginIPProtector := protector.NewLoginIPProtector(cfg.IPProtectorConfig)
 	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, cfg.OAuthServerConfig.CodeTokenNamespace)
 	login := fuyaopassword.NewLogin(idpLoginStore, k8sClient, tokenStore, loginIPProtector, cfg.LoginConfig)
@@ -79,7 +79,7 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
 
 	// csrf
-	CSRF := csrf.Protect([]byte(s.Cfg.IDPLoginStoreConfig.EncryptionKey), csrf.SameSite(csrf.SameSiteStrictMode),
+	CSRF := csrf.Protect(s.Cfg.IDPLoginStoreConfig.EncryptionKey, csrf.SameSite(csrf.SameSiteStrictMode),
 		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(s.Cfg.IDPLoginStoreConfig.SessionMaxAge),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/html")
