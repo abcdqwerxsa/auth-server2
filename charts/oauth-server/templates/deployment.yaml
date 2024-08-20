@@ -20,6 +20,16 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+      initContainers:
+        - name: init-permission
+          image: {{ .Values.image.busyBox }}
+          command: ["sh", "-c", "chmod -R 700 /var/log/oauth-server && chown -R 65532:65532 /var/log/oauth-server"]
+          volumeMounts:
+            - name: log-path
+              mountPath: /var/log/oauth-server
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
       containers:
         - name: oauth-server
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -47,8 +57,6 @@ spec:
               readOnly: true
               subPath: config.json
               mountPath: /config.json
-            - name: log-path
-              mountPath: /var/log/oauth-server
       volumes:
         {{- if .Values.config.httpServerConfig.enableHttps }}
         - name: oauth-server-tls

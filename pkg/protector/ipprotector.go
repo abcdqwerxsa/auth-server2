@@ -16,10 +16,10 @@ package protector
 import (
 	"container/list"
 	"math"
-	"openfuyao/oauth-server/pkg/zlog"
 	"time"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/zlog"
 )
 
 type failedLoginTracker struct {
