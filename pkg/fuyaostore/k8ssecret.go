@@ -16,10 +16,10 @@ package fuyaostore
 import (
 	"context"
 	"encoding/json"
-	"gopkg.in/oauth2.v3"
 	"strings"
 	"time"
 
+	"gopkg.in/oauth2.v3"
 	"gopkg.in/oauth2.v3/models"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
