@@ -137,7 +137,11 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 	// fetch params
 	req, err := s.ValidateAuthorizeRequest(r)
 	if err != nil {
-		s.redirectAuthorizationCodeError(w, req, err)
+		if err == fuyaoerrors.ErrRedirectURIIncorrect {
+			http.Redirect(w, r, "/", http.StatusFound)
+		} else {
+			s.redirectAuthorizationCodeError(w, req, err)
+		}
 		return
 	}
 

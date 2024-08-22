@@ -57,6 +57,8 @@ spec:
               readOnly: true
               subPath: config.json
               mountPath: /config.json
+            - name: log-path
+              mountPath: /var/log/oauth-server
       volumes:
         {{- if .Values.config.httpServerConfig.enableHttps }}
         - name: oauth-server-tls
