@@ -57,12 +57,12 @@ func TestLoginHandlerGetSucceed(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -108,12 +108,12 @@ func TestLoginHandlerPostSucceed(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -160,12 +160,12 @@ func TestLoginHandlerPostFail(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -197,12 +197,12 @@ func TestLoginHandlerUnknownMethod(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -236,12 +236,12 @@ func TestLoginPasswordConfirmHandlerGetSucceed(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
@@ -293,12 +293,12 @@ func TestLoginPasswordConfirmHandlerPostSucceed(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
@@ -379,12 +379,12 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordResetHandler(rr, req)
@@ -418,12 +418,12 @@ func TestLoginPasswordConfirmHandlerRevertSucceed(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
@@ -453,12 +453,12 @@ func TestNewLogin(t *testing.T) {
 	})
 
 	testLogin := &Login{
-		Provider:         "fuyaoPasswordProvider",
-		K8sClient:        fakeClient,
-		TokenStore:       fakeTokenStore,
-		Authenticator:    fakeAuthenticator,
-		idpLoginStore:    fakeIdpLoginStore,
-		loginIPProtector: fakeLoginIPProtector,
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginIPProtector,
 	}
 
 	tests := []struct {
@@ -484,7 +484,7 @@ func TestNewLogin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewLogin(tt.args.idpLoginStore, tt.args.k8sClient, tt.args.tokenStore, tt.args.loginIPProtector, tt.args.loginConfig)
-			if !reflect.DeepEqual(got.idpLoginStore, tt.want.idpLoginStore) || !reflect.DeepEqual(got.TokenStore, tt.want.TokenStore) || !reflect.DeepEqual(got.loginIPProtector, tt.want.loginIPProtector) {
+			if !reflect.DeepEqual(got.idpLoginStore, tt.want.idpLoginStore) || !reflect.DeepEqual(got.TokenStore, tt.want.TokenStore) || !reflect.DeepEqual(got.loginProtector, tt.want.loginProtector) {
 				t.Errorf("NewLogin() = %v, want %v", got, tt.want)
 			}
 		})
