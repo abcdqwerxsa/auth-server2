@@ -448,7 +448,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		// 发送请求
 		client := &http.Client{}
 		transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true,
-			MinVersion: tls.VersionTLS12}}
+			MinVersion: tls.VersionTLS13}}
 		client.Transport = transport
 		resp, err := client.Do(req)
 		if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
