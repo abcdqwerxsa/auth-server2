@@ -41,6 +41,7 @@ import (
 	"openfuyao/oauth-server/pkg/generators"
 	"openfuyao/oauth-server/pkg/httpserver"
 	"openfuyao/oauth-server/pkg/sessions"
+	"openfuyao/oauth-server/pkg/utils"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -311,7 +312,7 @@ func (s *FuyaoAuthorizeServer) ValidateAuthorizeRequest(r *http.Request) (*Fuyao
 	}
 
 	// fetch the path parameter identityProvider
-	idp := r.FormValue("identity_provider")
+	idp := utils.EscapeSpecialChars(r.FormValue("identity_provider"))
 	if idp == "" {
 		return nil, fuyaoerrors.ErrIdentityProviderIncorrect
 	}
@@ -539,7 +540,7 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	w.WriteHeader(status)
 	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
-		zlog.LogErrorf("%s, err: %s", fuyaoerrors.ErrStrFailToMarshalData, err)
+		zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToMarshalData, err)
 	}
 
 	return

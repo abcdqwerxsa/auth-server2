@@ -45,6 +45,7 @@ import (
 	"openfuyao/oauth-server/pkg/idp"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
+	"openfuyao/oauth-server/pkg/utils"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -276,7 +277,7 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := requestBody.Username
+	username := utils.EscapeSpecialChars(requestBody.Username)
 	byteOldPassword := requestBody.OriginalPassword
 	byteNewPassword := requestBody.NewPassword
 	defer destroyBytes(byteOldPassword)
@@ -404,7 +405,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
 		return
 	}
-	username := requestBody.Username
+	username := utils.EscapeSpecialChars(requestBody.Username)
 	bytePassword := requestBody.Password
 	defer destroyBytes(bytePassword)
 	then := requestBody.Then

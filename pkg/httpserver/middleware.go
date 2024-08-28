@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"time"
 
+	"openfuyao/oauth-server/pkg/utils"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -67,17 +68,15 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 			logFunc = zlog.LogWarnf
 		}
 		logFunc(
-			`%s - - [%s] %dms "%s %s %s" status:%d length:%d referer:"%s" "%s"`,
+			`%s - - [%s] "%s %s %s", status=%d, length=%d, duration=%dms`,
 			r.RemoteAddr,
-			start.Format("02/Jan/2006:15:04:05 -0700"),
 			time.Since(start).Milliseconds(),
 			r.Method,
-			r.RequestURI,
+			utils.EscapeSpecialChars(r.RequestURI),
 			r.Proto,
 			rl.status,
 			rl.size,
-			r.Header.Get("Referer"),
-			r.UserAgent(),
+			start.Format("02/Jan/2006:15:04:05 -0700"),
 		)
 	})
 }
