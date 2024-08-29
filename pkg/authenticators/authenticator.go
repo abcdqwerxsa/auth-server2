@@ -123,7 +123,7 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 	// get the secret
 	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot get the password secret for %s, err: %v", username, err)
+		zlog.LogErrorf("cannot get the password secret for %s", username)
 		return nil, nil, fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
@@ -203,7 +203,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username string, passwd []byte
 	// get the secret
 	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot get the password secret for %s, err: %v", username, err)
+		zlog.LogErrorf("cannot get the password secret for %s", username)
 		return fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
@@ -241,7 +241,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username string, passwd []byte
 	// save the secret back to the k8s
 	_, err = a.k8sClient.CoreV1().Secrets(a.ns).Update(context.TODO(), secret, v1.UpdateOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot save password to k8s secret, err: %v", err)
+		zlog.LogErrorf("cannot save password to k8s secret, err")
 		return fuyaoerrors.ErrFailToPatchSecret
 	}
 
