@@ -70,13 +70,13 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 		logFunc(
 			`%s - - [%s] "%s %s %s", status=%d, length=%d, duration=%dms`,
 			r.RemoteAddr,
-			time.Since(start).Milliseconds(),
+			start.Format("02/Jan/2006:15:04:05 -0700"),
 			r.Method,
 			utils.EscapeSpecialChars(r.RequestURI),
 			r.Proto,
 			rl.status,
 			rl.size,
-			start.Format("02/Jan/2006:15:04:05 -0700"),
+			time.Since(start).Milliseconds(),
 		)
 	})
 }
