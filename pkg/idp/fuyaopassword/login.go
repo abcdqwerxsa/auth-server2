@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -169,12 +170,12 @@ func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request
 
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action:      uri.String(),
-		Then:        then,
-		UserName:    username,
-		Base64Image: imageData,
-		CSRFToken:   string(csrf.TemplateField(r)),
-		Error:       errString,
+		Action:      html.EscapeString(uri.String()),
+		Then:        html.EscapeString(then),
+		UserName:    html.EscapeString(username),
+		Base64Image: html.EscapeString(imageData),
+		CSRFToken:   html.EscapeString(string(csrf.TemplateField(r))),
+		Error:       html.EscapeString(errString),
 	}
 
 	// render form
@@ -387,11 +388,11 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action:      uri.String(),
-		Then:        then,
-		Base64Image: imageData,
-		CSRFToken:   string(csrf.TemplateField(r)),
-		Error:       errString,
+		Action:      html.EscapeString(uri.String()),
+		Then:        html.EscapeString(then),
+		Base64Image: html.EscapeString(imageData),
+		CSRFToken:   html.EscapeString(string(csrf.TemplateField(r))),
+		Error:       html.EscapeString(errString),
 	}
 
 	// render form
