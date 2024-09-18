@@ -170,11 +170,11 @@ func (l *Login) handlePasswordConfirmForm(w http.ResponseWriter, r *http.Request
 
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action:      html.EscapeString(uri.String()),
+		Action:      uri.String(),
 		Then:        html.EscapeString(then),
-		UserName:    html.EscapeString(username),
-		Base64Image: html.EscapeString(imageData),
-		CSRFToken:   html.EscapeString(string(csrf.TemplateField(r))),
+		UserName:    username,
+		Base64Image: imageData,
+		CSRFToken:   string(csrf.TemplateField(r)),
 		Error:       html.EscapeString(errString),
 	}
 
@@ -388,10 +388,10 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 
 	// 生成loginForm
 	loginForm := LoginForm{
-		Action:      html.EscapeString(uri.String()),
+		Action:      uri.String(),
 		Then:        html.EscapeString(then),
-		Base64Image: html.EscapeString(imageData),
-		CSRFToken:   html.EscapeString(string(csrf.TemplateField(r))),
+		Base64Image: imageData,
+		CSRFToken:   string(csrf.TemplateField(r)),
 		Error:       html.EscapeString(errString),
 	}
 
