@@ -56,12 +56,13 @@ func NewOAuthServerAPIServer(
 
 	// init each component
 	k8sClient := config.GetKubernetesClient(cfg.K8sConfig)
+	dynamicClient := config.GetDynamicClient(cfg.K8sConfig)
 	idpLoginStore := sessions.NewSessionStore(
 		cfg.IDPLoginStoreConfig.SessionName, cfg.IDPLoginStoreConfig.SessionMaxAge,
 		cfg.IDPLoginStoreConfig.SigningKey, cfg.IDPLoginStoreConfig.EncryptionKey)
-	loginIPProtector := protector.NewLoginIPProtector(cfg.IPProtectorConfig)
+	logUserProtector := protector.NewLoginUserProtector(dynamicClient, cfg.IPProtectorConfig)
 	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, cfg.OAuthServerConfig.CodeTokenNamespace)
-	login := fuyaopassword.NewLogin(idpLoginStore, k8sClient, tokenStore, loginIPProtector, cfg.LoginConfig)
+	login := fuyaopassword.NewLogin(idpLoginStore, tokenStore, logUserProtector, cfg)
 	oauthServer := oauth2.NewOAuthServer(idpLoginStore, tokenStore, cfg.OAuthServerConfig)
 
 	return &OAuthServerAPIServer{
@@ -93,7 +94,7 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 				<body>
 					<h1>CSRF Token 过期</h1>
 					<p>您的登陆cookie已经过期</p>
-					<a href="/">点击此处重新进入openFuyao平台</a>
+					<a href="/">点击此处重新登陆openFuyao平台</a>
 				</body>
 				</html>
 			`

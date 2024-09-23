@@ -18,6 +18,7 @@ import (
 	"os/user"
 	"path"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -123,4 +124,15 @@ func GetKubernetesClient(k8sConfig *KubernetesConfig) kubernetes.Interface {
 	}
 
 	return k8sClient
+}
+
+// GetDynamicClient returns the dynamicClient with k8sConfig
+func GetDynamicClient(k8sConfig *KubernetesConfig) dynamic.Interface {
+	kubeConfig := GetKubeConfigOrInClusterConfig(k8sConfig)
+	dynamicClient, err := dynamic.NewForConfig(kubeConfig)
+	if err != nil {
+		zlog.LogFatalf("Error converting k8s config to dynamicClient")
+	}
+
+	return dynamicClient
 }

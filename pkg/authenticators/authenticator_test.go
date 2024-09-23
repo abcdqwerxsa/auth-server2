@@ -169,7 +169,6 @@ func TestNewFuyaoPasswordAuthenticator(t *testing.T) {
 			},
 			&FuyaoPasswordAuthenticator{
 				k8sClient: fakeClient,
-				ns:        "oauth-user",
 				encryptor: NewPBKDF2Encryptor(),
 			},
 		},
@@ -265,7 +264,6 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &FuyaoPasswordAuthenticator{
 				k8sClient: tt.fields.k8sClient,
-				ns:        tt.fields.ns,
 				encryptor: tt.fields.encryptor,
 			}
 			if got := a.checkPasswordComplexity(tt.args.username, tt.args.passwd); got != tt.want {
@@ -373,7 +371,6 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 		t.Run(tt.name, func(t *testing.T) {
 			a := &FuyaoPasswordAuthenticator{
 				k8sClient: tt.fields.k8sClient,
-				ns:        tt.fields.ns,
 				encryptor: tt.fields.encryptor,
 			}
 			got, got1, err := a.fetchUserInfoAndStoredPassword(tt.args.username)

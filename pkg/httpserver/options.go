@@ -37,7 +37,7 @@ type ServerOptions struct {
 // NewDefaultHttpServerOptions inits the default httpserver option
 func NewDefaultHttpServerOptions() *ServerOptions {
 	return &ServerOptions{
-		HttpPort:          9095,
+		HttpPort:          9096,
 		HttpsPort:         0,
 		TlsCertFile:       "",
 		TlsPrivateKeyFile: "",
@@ -108,7 +108,7 @@ func NewHttpServer(options *ServerOptions) (*http.Server, error) {
 		server.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{certificate},
 			ClientAuth:   tls.RequireAndVerifyClientCert,
-			MinVersion:   tls.VersionTLS12,
+			MinVersion:   tls.VersionTLS13,
 			ClientCAs:    caCertPool,
 		}
 		server.Addr = fmt.Sprintf(":%d", options.HttpsPort)

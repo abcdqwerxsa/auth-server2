@@ -27,17 +27,18 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/gorilla/csrf"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
 	"openfuyao/oauth-server/assets/templates"
-	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	overallconfigs "openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/authenticators"
+	"openfuyao/oauth-server/pkg/config"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/fuyaostore"
@@ -75,28 +76,31 @@ func (l *LoginForm) OutputHTML(w http.ResponseWriter, tpl string, name string) {
 type Login struct {
 	Provider string
 	// CSRF csrf.CSRF
-	K8sClient        kubernetes.Interface
-	TokenStore       *fuyaostore.K8sSecretStore
-	Authenticator    authenticators.PasswordAuthenticator
-	idpLoginStore    *sessions.CookieStore
-	loginIPProtector *protector.LoginIPProtector
+	K8sClient      kubernetes.Interface
+	dynamicClient  dynamic.Interface
+	TokenStore     *fuyaostore.K8sSecretStore
+	Authenticator  authenticators.PasswordAuthenticator
+	idpLoginStore  *sessions.CookieStore
+	loginProtector *protector.LoginUserProtector
 }
 
 // NewLogin returns the fuyao Login instance
 func NewLogin(
 	idpLoginStore *sessions.CookieStore,
-	k8sClient kubernetes.Interface,
 	tokenStore *fuyaostore.K8sSecretStore,
-	loginIPProtector *protector.LoginIPProtector,
-	loginConfig *config.LoginConfig,
+	loginUserProtector *protector.LoginUserProtector,
+	cfg *overallconfigs.OAuthServerAPIServerConfig,
 ) *Login {
+	k8sClient := config.GetKubernetesClient(cfg.K8sConfig)
+	dynamicClient := config.GetDynamicClient(cfg.K8sConfig)
 	return &Login{
-		Provider:         loginConfig.Provider,
-		K8sClient:        k8sClient,
-		TokenStore:       tokenStore,
-		Authenticator:    authenticators.NewFuyaoPasswordAuthenticator(k8sClient, loginConfig.UserNamespace),
-		idpLoginStore:    idpLoginStore,
-		loginIPProtector: loginIPProtector,
+		Provider:       cfg.LoginConfig.Provider,
+		K8sClient:      k8sClient,
+		dynamicClient:  dynamicClient,
+		TokenStore:     tokenStore,
+		Authenticator:  authenticators.NewFuyaoPasswordAuthenticator(dynamicClient, cfg.LoginConfig.UserNamespace),
+		idpLoginStore:  idpLoginStore,
+		loginProtector: loginUserProtector,
 	}
 }
 
@@ -294,7 +298,7 @@ func (l *Login) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		zlog.LogErrorf("Password Reset failed, error: %v", err)
 		// add failed records and check blocking
 		if errors.Is(err, fuyaoerrors.ErrPasswordResetFailed) {
-			blocked, errString := l.checkForIPBlocking(ipAddress)
+			blocked, errString := l.checkForUserBlocking(username)
 			if blocked {
 				httpserver.RespondWithStatusMsg(w, http.StatusFound, 0, errString)
 			} else {
@@ -422,10 +426,11 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// login devastation check
 	ipAddress := getIPAddress(r)
 	zlog.LogInfof("Login request from %s: Username: %s\n", ipAddress, username)
-	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
+	// 这里变成直接查询userStatus
+	if locked, remainingTime := l.loginProtector.CheckLocked(username); locked {
 		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
 			strconv.FormatInt(remainingTime, constants.Decimal), 1)
-		zlog.LogErrorf("Login request fail, the ip %s is still blocked", ipAddress)
+		zlog.LogErrorf("Login request fail, the user %s is still blocked", username)
 		redirectGetMethodWithError(w, r, errString, then)
 		return
 	}
@@ -442,13 +447,14 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// password authentication error
 	if !ok {
-		_, errString := l.checkForIPBlocking(ipAddress)
+		// 这里给对应用户的blocker加一
+		_, errString := l.checkForUserBlocking(username)
 		redirectGetMethodWithError(w, r, errString, then)
 		return
 	}
 
-	// successfully login, erase ip block flag
-	l.loginIPProtector.Unlock(ipAddress)
+	// successfully login, erase user block flags
+	l.loginProtector.Unlock(username)
 
 	// redirect if already logged in
 	if _, ok = l.idpLoginStore.Get(r).GetString(constants.UserName); ok {
@@ -467,9 +473,9 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, then, http.StatusFound)
 }
 
-func (l *Login) checkForIPBlocking(ipAddress string) (bool, string) {
+func (l *Login) checkForUserBlocking(username string) (bool, string) {
 	// current ip failed times +1
-	remainingAttempt := l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
+	remainingAttempt := l.loginProtector.AddFailedLogin(username)
 
 	// still got login attempts
 	if remainingAttempt > 0 {
@@ -479,11 +485,11 @@ func (l *Login) checkForIPBlocking(ipAddress string) (bool, string) {
 		return false, errString
 	}
 
-	// trigger ip blocking
-	lockDuration := int64(l.loginIPProtector.LockDuration.Minutes())
+	// trigger user blocking
+	lockDuration := int64(l.loginProtector.LockDuration.Minutes())
 	errString := strings.Replace(fuyaoerrors.ErrStrPasswordAuthenticationFailedLocked, "%s",
 		strconv.FormatInt(lockDuration, constants.Decimal), 1)
-	zlog.LogErrorf("Login request fail and trigger ip blocking for %s", ipAddress)
+	zlog.LogErrorf("Login request fail and trigger user blocking for %s", username)
 	return true, errString
 }
 
