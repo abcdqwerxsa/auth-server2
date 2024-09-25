@@ -40,19 +40,6 @@ spec:
           args:
             - --configFile=config.json
           volumeMounts:
-            {{- if .Values.config.httpServerConfig.enableHttps }}
-            - name: oauth-server-tls
-              mountPath: /ssl/ca.pem
-              subPath: ca.crt
-            - name: oauth-server-tls
-              readOnly: true
-              mountPath: /ssl/server.key
-              subPath: tls.key
-            - name: oauth-server-tls
-              readOnly: true
-              mountPath: /ssl/server.crt
-              subPath: tls.crt
-            {{- end }}
             - name: config-volume
               readOnly: true
               subPath: config.json
@@ -63,12 +50,6 @@ spec:
           resources: {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
       volumes:
-        {{- if .Values.config.httpServerConfig.enableHttps }}
-        - name: oauth-server-tls
-          secret:
-            defaultMode: 0600
-            secretName: oauth-server-tls
-        {{- end }}
         - name: config-volume
           configMap:
             defaultMode: 0600

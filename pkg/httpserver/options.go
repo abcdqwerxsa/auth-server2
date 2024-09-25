@@ -14,12 +14,15 @@
 package httpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"net/http"
-	"os"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"openfuyao/oauth-server/pkg/config"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/zlog"
@@ -52,32 +55,6 @@ func (s *ServerOptions) Validate() []error {
 		errs = append(errs, fuyaoerrors.ErrInvalidHttpAndHttpsPort)
 	}
 
-	if s.HttpsPort > constants.MinHttpPort && s.HttpsPort < constants.MaxHttpPort {
-		if s.TlsCertFile == "" {
-			errs = append(errs, fuyaoerrors.ErrEmptyCertFile)
-		} else {
-			if _, err := os.Stat(s.TlsCertFile); err != nil {
-				errs = append(errs, err)
-			}
-		}
-
-		if s.TlsPrivateKeyFile == "" {
-			errs = append(errs, fuyaoerrors.ErrEmptyPrivateKeyFile)
-		} else {
-			if _, err := os.Stat(s.TlsPrivateKeyFile); err != nil {
-				errs = append(errs, err)
-			}
-		}
-
-		if s.RootCAFile == "" {
-			errs = append(errs, fuyaoerrors.ErrEmptyMasterCAFile)
-		} else {
-			if _, err := os.Stat(s.RootCAFile); err != nil {
-				errs = append(errs, err)
-			}
-		}
-	}
-
 	return errs
 }
 
@@ -86,23 +63,21 @@ func NewHttpServer(options *ServerOptions) (*http.Server, error) {
 	server := &http.Server{Addr: fmt.Sprintf(":%d", options.HttpPort)}
 
 	if options.HttpsPort != 0 {
-		// load server.key and server.crt
-		certificate, err := tls.LoadX509KeyPair(options.TlsCertFile, options.TlsPrivateKeyFile)
+		tlsStuff, err := loadX509KeyPairAndCA(constants.TlsSecretName, constants.TlsSecretNamespace)
 		if err != nil {
-			zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToLoadCert, err)
+			zlog.LogErrorf(fuyaoerrors.ErrStrFailToLoadCert)
 			return nil, fuyaoerrors.ErrFailToLoadCert
 		}
 
-		// load RootCA
-		caCert, err := os.ReadFile(options.RootCAFile)
+		certificate, err := tls.X509KeyPair(tlsStuff.crt, tlsStuff.key)
 		if err != nil {
-			zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToLoadCert, err)
+			zlog.LogErrorf(fuyaoerrors.ErrStrFailToLoadCert)
 			return nil, fuyaoerrors.ErrFailToLoadCert
 		}
 
 		// create the cert pool
 		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
+		caCertPool.AppendCertsFromPEM(tlsStuff.ca)
 
 		// configure the tls
 		server.TLSConfig = &tls.Config{
@@ -115,4 +90,28 @@ func NewHttpServer(options *ServerOptions) (*http.Server, error) {
 	}
 
 	return server, nil
+}
+
+type tlsStruct struct {
+	crt []byte
+	key []byte
+	ca  []byte
+}
+
+func loadX509KeyPairAndCA(secretName, namespace string) (tlsStruct, error) {
+	k8sClient := config.GetKubernetesClient(nil)
+	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, v1.GetOptions{})
+	if err != nil {
+		return tlsStruct{}, fuyaoerrors.ErrFailToLoadCert
+	}
+
+	cert, ok1 := secret.Data["tls.crt"]
+	key, ok2 := secret.Data["tls.key"]
+	ca, ok3 := secret.Data["ca.crt"]
+
+	if !ok1 || !ok2 || !ok3 {
+		return tlsStruct{}, fuyaoerrors.ErrFailToLoadCert
+	}
+
+	return tlsStruct{crt: cert, key: key, ca: ca}, nil
 }

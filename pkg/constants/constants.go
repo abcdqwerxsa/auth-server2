@@ -104,3 +104,9 @@ const (
 const (
 	AuthCodeByteLength = 16
 )
+
+// Constants for tls secret
+const (
+	TlsSecretName      = "oauth-server-tls"
+	TlsSecretNamespace = "fuyao-oauth"
+)

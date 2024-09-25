@@ -8,10 +8,7 @@ data:
     {
       "HttpServerConfig": {
         {{- if .Values.config.httpServerConfig.enableHttps }}
-        "HttpsPort": {{ .Values.config.httpServerConfig.port }},
-        "TlsCertFile": "/ssl/server.crt",
-        "TlsPrivateKeyFile": "/ssl/server.key",
-        "RootCAFile": "/ssl/ca.pem"
+        "HttpsPort": {{ .Values.config.httpServerConfig.port }}
         {{- else }}
         "HttpPort": {{ .Values.config.httpServerConfig.port }}
         {{- end }}
