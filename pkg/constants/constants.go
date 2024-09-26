@@ -99,3 +99,14 @@ const (
 const (
 	Decimal = 10
 )
+
+// Constants for authcode generation
+const (
+	AuthCodeByteLength = 16
+)
+
+// Constants for tls secret
+const (
+	TlsSecretName      = "oauth-server-tls"
+	TlsSecretNamespace = "fuyao-oauth"
+)
