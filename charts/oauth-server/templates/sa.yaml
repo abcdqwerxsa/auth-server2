@@ -7,30 +7,6 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: oauth-user-role
-  namespace: oauth-user
-rules:
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: oauth-user-rolebinding
-  namespace: oauth-user
-subjects:
-  - kind: ServiceAccount
-    name: oauth-server
-    namespace: fuyao-oauth
-roleRef:
-  kind: Role
-  name: oauth-user-role
-  apiGroup: rbac.authorization.k8s.io
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
   name: oauth-code-token-role
   namespace: oauth-code-token
 rules:

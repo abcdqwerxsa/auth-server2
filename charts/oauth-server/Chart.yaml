@@ -2,5 +2,5 @@ apiVersion: v2
 name: oauth-server
 description: A Helm chart for Fuyao OAuth2.0 server
 type: application
-version: 0.0.0-latest
+version: 0.0.0-multicluster
 appVersion: "latest"
