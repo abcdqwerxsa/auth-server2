@@ -427,10 +427,7 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	ipAddress := getIPAddress(r)
 	zlog.LogInfof("Login request from %s: Username: %s\n", ipAddress, username)
 	// 这里变成直接查询userStatus
-	if locked, remainingTime := l.loginProtector.CheckLocked(username); locked {
-		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
-			strconv.FormatInt(remainingTime, constants.Decimal), 1)
-		zlog.LogErrorf("Login request fail, the user %s is still blocked", username)
+	if locked, errString := l.loginProtector.CheckLocked(username); locked {
 		redirectGetMethodWithError(w, r, errString, then)
 		return
 	}

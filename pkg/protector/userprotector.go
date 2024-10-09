@@ -13,13 +13,18 @@
 package protector
 
 import (
+	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/constants"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/fuyaouser"
 	"openfuyao/oauth-server/pkg/zlog"
 )
@@ -41,20 +46,22 @@ func NewLoginUserProtector(client dynamic.Interface, config *config.IPProtectorC
 }
 
 // CheckLocked checks whether username is locked and return the remaining locked time if it's locked
-func (p *LoginUserProtector) CheckLocked(username string) (bool, int64) {
+func (p *LoginUserProtector) CheckLocked(username string) (bool, string) {
 	// fetch user cr
 	userCR, err := fuyaouser.GetUserInfo(p.dynamicClient, username)
 	if err != nil {
-		zlog.LogErrorf("cannot fetch user %s from userCRs, err: %v", username, err)
-		return true, 0
+		zlog.LogErrorf("user %s does not exist, err: %v", username, err)
+		return true, fmt.Sprintf("用户%s不存在", username)
 	}
 
 	if userCR.Status.LockStatus == "Locked" {
 		remainingTime := math.Ceil(userCR.Status.LockedTimestamp.Add(p.LockDuration).Sub(time.Now()).Minutes())
-		return true, int64(remainingTime)
+		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
+			strconv.FormatInt(int64(remainingTime), constants.Decimal), 1)
+		return true, errString
 	}
 
-	return false, 0
+	return false, ""
 }
 
 // AddFailedLogin adds a new failed sample to the user and return attempts left to try logging in
