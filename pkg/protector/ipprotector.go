@@ -72,13 +72,17 @@ func (p *LoginIPProtector) AddFailedLogin(ip string, timestamp time.Time) int {
 }
 
 // Unlock releases the locked ip
-func (p *LoginIPProtector) Unlock(ip string) {
+func (p *LoginIPProtector) Unlock(ip string) bool {
+	changed := false
 	if p.ipProtector[ip].locked {
+		changed = true
 		zlog.LogInfof("unlocking ip %s for user login", ip)
 	}
 	p.ipProtector[ip].locked = false
 	p.ipProtector[ip].lockTime = time.Time{}
 	p.ipProtector[ip].queue = list.New()
+
+	return changed
 }
 
 // CheckLocked checks whether ip is locked and return the remaining locked time if it's locked

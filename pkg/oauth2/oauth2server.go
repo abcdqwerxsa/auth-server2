@@ -19,6 +19,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"openfuyao/oauth-server/pkg/audit"
 	"regexp"
 	"strings"
 	"time"
@@ -63,6 +64,8 @@ type FuyaoAuthorizeServer struct {
 	oauthProxyStore map[string]map[string]string
 	// authCode2SessionID maps each auth-code to the central sessionID
 	authCode2SessionID map[string]string
+	// auditor
+	auditor *audit.Auditor
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer
@@ -78,6 +81,7 @@ func NewFuyaoAuthorizeServer(
 		tokenStore:         tokenStore,
 		oauthProxyStore:    make(map[string]map[string]string),
 		authCode2SessionID: make(map[string]string),
+		auditor:            audit.NewAuditor(),
 	}
 }
 
@@ -428,6 +432,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
 		}
 		// we only log the error, the logout needs to proceed
+		s.auditor.LogSucceedOperation("admin", "logout", r)
 		httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
 		return
 	}
@@ -461,14 +466,14 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 
 	// flush the loginState
 	if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+		s.auditor.LogFailOperation("admin", "logout", "cannot delete the loginstore cookie", r)
 		httpserver.RespondWithStatusMsg(w, http.StatusInternalServerError, 0, err.Error())
 		return
 	}
 	delete(s.oauthProxyStore, oauthServerSessionID)
 	// flush the gorilla.csrf
 	clearCSRFCookie(w)
-	zlog.LogInfof("Logout succeed for user")
+	s.auditor.LogSucceedOperation("admin", "logout", r)
 
 	// no content to return
 	httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")

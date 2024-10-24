@@ -106,6 +106,22 @@ func getDefaultConf() *LogConfig {
 	return defaultConf
 }
 
+// GetDefaultAuditConf inits the default audit config
+func GetDefaultAuditConf() *LogConfig {
+	return &LogConfig{
+		Level:       "info",
+		EncoderType: "console",
+		Path:        defaultLogPath,
+		FileName:    "audit.log",
+		MaxSize:     20,
+		MaxBackups:  5,
+		MaxAge:      30,
+		LocalTime:   true,
+		Compress:    true,
+		OutMod:      "both",
+	}
+}
+
 // GetLogger inits the logger by config
 func GetLogger(conf *LogConfig) *zap.SugaredLogger {
 	writeSyncer := getLogWriter(conf)
