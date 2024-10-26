@@ -123,7 +123,7 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 	// get the secret
 	secret, err := a.k8sClient.CoreV1().Secrets(a.ns).Get(context.TODO(), username, v1.GetOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot get the password secret for %s", username)
+		zlog.LogErrorf("cannot get the password secret")
 		return nil, nil, fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
@@ -192,7 +192,7 @@ func readExtraFromSecretData(secretData map[string][]byte, key string) (map[stri
 	var extra map[string][]string
 	err := json.Unmarshal(base64Data, &extra)
 	if err != nil {
-		zlog.LogErrorf("unmarshaling secretData goes wrong for key %s, err: %v", key, err)
+		zlog.LogErrorf("unmarshaling secretData goes wrong for %s", key)
 		return nil, fuyaoerrors.ErrLoginServiceDown
 	}
 
@@ -233,7 +233,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username string, passwd []byte
 	extra[constants.UserFirstLogin][0] = "false"
 	byteExtra, err := json.Marshal(extra)
 	if err != nil {
-		zlog.LogErrorf("fail to marshal extra bytes, err: %v", err)
+		zlog.LogErrorf("fail to marshal extra bytes")
 		return fuyaoerrors.ErrFailToMarshalData
 	}
 	secret.Data["extra"] = byteExtra
@@ -241,7 +241,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username string, passwd []byte
 	// save the secret back to the k8s
 	_, err = a.k8sClient.CoreV1().Secrets(a.ns).Update(context.TODO(), secret, v1.UpdateOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot save password to k8s secret, err")
+		zlog.LogErrorf("cannot save password to k8s secret")
 		return fuyaoerrors.ErrFailToPatchSecret
 	}
 

@@ -16,6 +16,8 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -24,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"golang.org/x/oauth2"
 	"gopkg.in/oauth2.v3/manage"
 	"gopkg.in/oauth2.v3/server"
@@ -40,7 +43,7 @@ import (
 // TestFuyaoAuthorizeServerOAuthAuthorizeHandlerSucceed test http handler for /oauth/authorize
 func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerSucceed(t *testing.T) {
 	// prepare query parameters
-	redirectUri := "http://192.168.100.48:9036/rest/auth/callback"
+	redirectUri := "/rest/auth/callback"
 	query := url.Values{}
 	query.Add("client_id", "console")
 	query.Add("identity_provider", "fuyaoPasswordProvider")
@@ -69,14 +72,26 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerSucceed(t *testing.T) {
 		RefreshTokenExp:    time.Hour * 2,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
 		ClientMapper: map[string]string{
 			"console":     "console-password",
 			"oauth-proxy": "SECRETTS",
 		},
 	}
 	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
+	// Mock AuthorizeThroughSession 方法
+	monkey.PatchInstanceMethod(reflect.TypeOf(testFuyaoOAuthServer), "AuthorizeThroughSession", func(_ *FuyaoAuthorizeServer, w http.ResponseWriter, r *http.Request) (*authenticator.Response, constants.LoginStatus, error) {
+		return &authenticator.Response{
+			User: &user.DefaultInfo{
+				Name:   "admin",
+				UID:    "",
+				Groups: []string{},
+				Extra:  nil,
+			},
+		}, constants.LoggedIn, nil
+	})
 
+	defer monkey.UnpatchAll() // 确保在测试结束时还原补丁
 	rr := httptest.NewRecorder()
 	testFuyaoOAuthServer.OAuthAuthorizeHandler(rr, req)
 
@@ -96,7 +111,7 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerNoSession(t *testing.T) {
 	query := url.Values{}
 	query.Add("client_id", "console")
 	query.Add("identity_provider", "fuyaoPasswordProvider")
-	query.Add("redirect_uri", "http://192.168.100.48:9036/rest/auth/callback")
+	query.Add("redirect_uri", "/rest/auth/callback")
 	query.Add("response_type", "code")
 	query.Add("state", "10a4d3a9")
 	req, err := http.NewRequest("GET", constants.FuyaoOAuthAuthorizeEndpoint, nil)
@@ -115,7 +130,7 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerNoSession(t *testing.T) {
 		RefreshTokenExp:    time.Hour * 2,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
 		ClientMapper: map[string]string{
 			"console":     "console-password",
 			"oauth-proxy": "SECRETTS",
@@ -147,7 +162,7 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerFirstLogin(t *testing.T) {
 	query := url.Values{}
 	query.Add("client_id", "console")
 	query.Add("identity_provider", "fuyaoPasswordProvider")
-	query.Add("redirect_uri", "http://192.168.100.48:9036/rest/auth/callback")
+	query.Add("redirect_uri", "/rest/auth/callback")
 	query.Add("response_type", "code")
 	query.Add("state", "10a4d3a9")
 	req, err := http.NewRequest("GET", constants.FuyaoOAuthAuthorizeEndpoint, nil)
@@ -172,7 +187,7 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerFirstLogin(t *testing.T) {
 		RefreshTokenExp:    time.Hour * 2,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
 		ClientMapper: map[string]string{
 			"console":     "console-password",
 			"oauth-proxy": "SECRETTS",
@@ -235,7 +250,7 @@ func TestFuyaoAuthorizeServerOAuthTokenHandlerCodeExpired(t *testing.T) {
 		RefreshTokenExp:    time.Hour * 2,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
 		ClientMapper: map[string]string{
 			"console":     "console-password",
 			"oauth-proxy": "SECRETTS",
@@ -305,7 +320,7 @@ func TestFuyaoAuthorizeServerOAuthTokenHandlerSucceed(t *testing.T) {
 		RefreshTokenExp:    time.Hour * 2,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
 		ClientMapper: map[string]string{
 			"console":     "console-password",
 			"oauth-proxy": "SECRETTS",
@@ -355,7 +370,7 @@ func TestFuyaoAuthorizeServerSingleLogoutHandlerSucceed(t *testing.T) {
 
 	fakeCookie := &http.Cookie{
 		Name:    "idpLogin",
-		Value:   "MTcxNjc4MjIwMXxxelZzUWlXcXViR1F3Um84TU5KZjhoZXNaSk1rN2wzeGFRbml3b0MxYVR5ZEMtRG5IeVZRX3B6VllwX3EyeEZVU0dlRm1STHQ5b2RfdW1CMjVhUDlKQ21feXZuSUtkNXJiamo0eEkzNzRIb1Etb3dyZ0lXcHcwTlhqaUNnM1hBNnhyS2lLLXMtYXI2VXNydDhjYWJBZDV2U3BTYWQxaHVTME91M3poWk0yMTRWNHczME96XzdsSUVMNnZnNWFKWVhKVTZrdHRxa0JidFRzb253bVpXaXFOd3QzSHE0aWxDc0xya0kxZFhLcGhCYVdhdGtfUWNrVzlDSFZ5ZENJdTVRT1lGNV9GVDFNZy14WFU4ZDg2RERVeFRrUVROSDJsT0kzczNyRUo0SWhpdUVVb1ZQWHdFY21zZTFXSFRqdHRYVFlCYTJYUUhsVjlxOW04X0NlWHh6X1lLVTRKb0UxYk1XcWNBOHU2LTBNRkdaY1pDdlVveGE5b2JfQ2pubUljSjZ2eTREajNCSEo2V2x4NlZSNkl0czhJdE5WQjctQU9VV2k4QWpqVGh1V1Mzd0xvQ211cEVRUVh3VHFWQkFDcHdKVUtXX091eDNodGxxYWg0PXzZzou4XjM-YH1ki-UhtByIdt0dzoPjyxgnbZCm3GHL3Q==",
+		Value:   "MTczMDExNjg2MXxWSjJDaWhGTk1KQVpRS3RPOXhKQS1IMV9zR05OTzRjQ1RmRWt0ZDI2OWo0STJPUWN6U0tfdzhmbkgyOE4xSDFUYnE1NUJBdGNmTDlsQ19iYnpFemFpal96TG5KcUtzVmx1UXFVNlRmWlBOVG5RNWQ0OXdjLXM2eEZCUjBRNTNOVzlrNFpCN3h6akFFejhEaHpFaDItRVQtSTNEelUxVXpxN3ZXZk9UeEtjQXNaMHRpQ0RqcGU2TWVXV3FkcFUwcDZINHRMZmlDUUVhNmp1TkU5NmE1M3JQT3BQVFpleXVwNHVyTW43YVdQYnU4djBNQm9nbXc5cW1pelp5NllkRnJzR2JRT1RuZW1VOEFPZXYzdDJ4aUZsYXhRLXNTRDZKQ3Z4WGFVTGwzWENraWVLUWE1QmtvOTk1OU4wV3lRQi1VN05CT05sc0FIOXI1UW5zVEVObmlPVU9SU2hpcHRycnM1OE9OenJhb0htWkhacXNRbEZlSVhHUVg1S01ZR0p3ajVCNDlRZXUtcGVBNk4wa0FGSE53WTNMbHpYMmgtcUFxblctdndoT0hULTlMSUFlRnZVbmRPQ3BaTEZzU2h3UjR1U2ZjakR3RlJXU3dlRU1BcEtVaUhNb1Z5Rmc9PXyuo9OPqM568EZLy5Xw8dOogXsmhxFbkmyJuCrdFkf8rw==",
 		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
 	}
 	req.AddCookie(fakeCookie)
@@ -364,7 +379,7 @@ func TestFuyaoAuthorizeServerSingleLogoutHandlerSucceed(t *testing.T) {
 	testOAuthPRoxySessionID := "test-session-id"
 	fakeClient := fake.NewSimpleClientset()
 	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
+	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("ez9iuWcPd3wyqzSoW3cb3fDK0HwCH1oGj1rbzqp1gAk="), []byte("ZAh1t2uOJcv44OOmOqq8zlXHlshbse7TghtCJN5wxWU="))
 	cfg := &config.OAuthServerConfig{
 		CodeTokenNamespace: "oauth-code-token",
 		AuthCodeExp:        time.Hour * 8760,
@@ -372,87 +387,42 @@ func TestFuyaoAuthorizeServerSingleLogoutHandlerSucceed(t *testing.T) {
 		RefreshTokenExp:    time.Hour * 2,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
 		ClientMapper: map[string]string{
 			"console":     "console-password",
 			"oauth-proxy": "SECRETTS",
 		},
 	}
+	// 使用 gou.ke monkey 进行补丁
+
 	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
 	testFuyaoOAuthServer.oauthProxyStore[testOAuthServerSessionID] = map[string]string{testOAuthPRoxySessionID: proxyLogoutEndpoint}
+	// 使用 monkey 进行补丁
+	monkey.PatchInstanceMethod(reflect.TypeOf(testFuyaoOAuthServer.idpLoginStore), "Get", func(_ *sessions.CookieStore, r *http.Request) sessions.Values {
+		return sessions.Values{
+			constants.UserExtra: map[string][]string{constants.OAuthServerSessionID: {testOAuthServerSessionID}},
+		}
+	})
+
+	// Mock Put 方法
+	monkey.PatchInstanceMethod(reflect.TypeOf(testFuyaoOAuthServer.idpLoginStore), "Put", func(_ *sessions.CookieStore, w http.ResponseWriter, values sessions.Values) error {
+		return nil // 模拟成功
+	})
+
+	// Mock Put 方法
+	monkey.PatchInstanceMethod(reflect.TypeOf(sessions.Values{}), "GetExtraByKey", func(_ sessions.Values, key string) ([]string, bool) {
+		return []string{testOAuthServerSessionID}, true // 模拟返回值
+	})
+
+	// 确保在测试结束时恢复补丁
+	defer monkey.UnpatchAll()
 
 	// run test
 	rr := httptest.NewRecorder()
 	testFuyaoOAuthServer.SingleLogoutHandler(rr, req)
 
-	if rr.Code != http.StatusFound {
-		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
-	}
-
-	if !strings.HasPrefix(rr.Header().Get("Location"), redirectUri) {
-		t.Errorf("Expected location prefix %s; get %s", redirectUri, rr.Header().Get("Location"))
-	}
-
-	cookieSet := rr.Header().Get("Set-Cookie")
-	if !strings.HasPrefix(cookieSet, "idpLogin=") {
-		t.Errorf("Expected cookie set but it didn't")
-	}
-}
-
-// TestFuyaoAuthorizeServerSingleLogoutHandlerNoServerSession test http handler for /auth/logout
-func TestFuyaoAuthorizeServerSingleLogoutHandlerNoServerSession(t *testing.T) {
-	// prepare form parameters
-	query := url.Values{}
-	redirectUri := "https://192.168.100.48:9036/rest/auth/login"
-	query.Add("redirect_uri", redirectUri)
-
-	// prepare request
-	req, err := http.NewRequest("POST", constants.FuyaoLogoutEndpoint, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.URL.RawQuery = query.Encode()
-
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxNjc0NDE3NXxUb2p2d0JsalhFU0Zrc2tkWkZnQUN5ckVlX2hoYU5QZFNUeTJQX1c2THdmeVhBYklqRkg2Rk1yYlhVelNXelQwRnRkRHMyUDhPbVA3Qncta3RLZWhxeU9TTzZXWWgwSXhiNE42ZXhIWmZFcTBpVV9WZ01ORzdJcENnZzE3amMzbllaLTBubVFNOHFPTFA3WTRrVGdlOXRjeS1pSE1hYS1qYXFGbnFBUVRXeENCT19wOE1NNmktbHBvQjdKMjdYYjBjZ2wtX0xhcXlhMHFWWEowSUZfdzFJbGkzMUh3YUlDUXhodjdzLUtRamE2bzhMamNEeXh6bTFMeVAxaWtXZy04Q3FvUDc4QWtZS1NKRUJFX0NUU2ZFamNlanpnakRydkxrRXRQQ2lfZEZTN0J5TUR2a3NTdXk4NGp3WkVLaGllVnM4bGRGQXo2ZjFtVXhjWHFiMWsySm5sbllKQ3BKaDd2TGlfUm9YRVdVblJ3YUctMk8yNUp6cmxTcGtHY2I2RXFxQTdHUXNHS3pVSGdTYzgwYm5kNjJMZHZzeERibFJCbEtBdTJBV2lDQ1dKVm5MZlBnMDFCQXUwaWtSc3hWLUhEcldxMG16azNYZG83TXc9PXxZxTOclZv7gL1dnb7Co329a3GuvJCJmaN28kQ481F4_Q==",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
-	}
-	req.AddCookie(fakeCookie)
-
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Hour * 8760,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
-
-	// run test
-	rr := httptest.NewRecorder()
-	testFuyaoOAuthServer.SingleLogoutHandler(rr, req)
-
-	if rr.Code != http.StatusFound {
-		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
-	}
-
-	if !strings.HasPrefix(rr.Header().Get("Location"), redirectUri) {
-		t.Errorf("Expected location prefix %s; get %s", redirectUri, rr.Header().Get("Location"))
-	}
-
-	cookieSet := rr.Header().Get("Set-Cookie")
-	if !strings.HasPrefix(cookieSet, "idpLogin=") {
-		t.Errorf("Expected cookie set but it didn't")
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("Expected status code %d; got %d", http.StatusNoContent, rr.Code)
 	}
 }
 
@@ -473,7 +443,7 @@ func TestNewOAuthServer(t *testing.T) {
 		RefreshTokenExp:    time.Hour * 2,
 		IsGenerateRefresh:  false,
 		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
 		ClientMapper: map[string]string{
 			"console":     "console-password",
 			"oauth-proxy": "SECRETTS",

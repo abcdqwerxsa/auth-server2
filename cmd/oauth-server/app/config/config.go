@@ -164,8 +164,8 @@ func newDefaultIPProtectorConfig() *IPProtectorConfig {
 // Validate either all fields are not set (0) or all fields are set (not 0) is legal
 func (i *IPProtectorConfig) Validate() []error {
 	var errs []error
-	if i.FailTimes == 0 && i.FailDuration == 0 || i.LockDuration == 0 {
-		return nil
+	if i.FailTimes == 0 && i.FailDuration == 0 && i.LockDuration == 0 {
+		return errs
 	}
 
 	if i.FailTimes == 0 || i.FailDuration == 0 || i.LockDuration == 0 {

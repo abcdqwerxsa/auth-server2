@@ -83,7 +83,7 @@ type Login struct {
 	Authenticator    authenticators.PasswordAuthenticator
 	idpLoginStore    *sessions.CookieStore
 	loginIPProtector *protector.LoginIPProtector
-	auditor          *audit.Auditor
+	auditor          *audit.OAuthAuditor
 }
 
 // NewLogin returns the fuyao Login instance
@@ -243,7 +243,7 @@ func (l *Login) processPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 func (l *Login) revertPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 	// delete loginState
 	if err := l.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+		zlog.LogErrorf("cannot delete the loginstore used in authorization")
 	}
 
 	// redirect to console-service host
@@ -358,7 +358,7 @@ func (l *Login) authenticateByWebhook(accessToken string) (bool, error) {
 	tokenReviewResponse, err := l.K8sClient.AuthenticationV1().TokenReviews().Create(
 		context.TODO(), tokenReview, metav1.CreateOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot post tokenReview to k8s, err: %v", err)
+		zlog.LogErrorf("cannot post tokenReview to k8s")
 		return false, fuyaoerrors.ErrNotLogin
 	}
 
@@ -407,15 +407,12 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 
 func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	// read params from r.url
-	var requestBody LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+	username, bytePassword, then := extractLoginInfo(r)
+	if username == "" {
 		httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
 		return
 	}
-	username := utils.EscapeSpecialChars(requestBody.Username)
-	bytePassword := requestBody.Password
 	defer destroyBytes(bytePassword)
-	then := requestBody.Then
 
 	// check form value
 	if len(username) == 0 || len(bytePassword) == 0 {
@@ -431,10 +428,8 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 
 	// login devastation check
 	ipAddress := utils.GetIPAddress(r)
-	zlog.LogInfof("Login request from %s: Username: %s\n", ipAddress, username)
 	if locked, remainingTime := l.loginIPProtector.CheckLocked(ipAddress); locked {
-		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s",
-			strconv.FormatInt(remainingTime, constants.Decimal), 1)
+		errString := strings.Replace(fuyaoerrors.ErrStrLoginBlocked, "%s", remainingTime, 1)
 		l.auditor.LogFailOperation("admin", "login", "ip still in block", r)
 		redirectGetMethodWithError(w, r, errString, then)
 		return
@@ -480,6 +475,19 @@ func (l *Login) processLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, then, http.StatusFound)
 }
 
+func extractLoginInfo(r *http.Request) (string, []byte, string) {
+	var requestBody LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		return "", nil, ""
+	}
+
+	username := utils.EscapeSpecialChars(requestBody.Username)
+	bytePassword := requestBody.Password
+	then := requestBody.Then
+
+	return username, bytePassword, then
+}
+
 func (l *Login) checkForIPBlocking(ipAddress string, r *http.Request) (bool, string) {
 	// current ip failed times +1
 	remainingAttempt := l.loginIPProtector.AddFailedLogin(ipAddress, time.Now())
@@ -517,7 +525,7 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 	// save the extra information
 	jsonExtra, err := json.Marshal(extra)
 	if err != nil {
-		zlog.LogErrorf("cannot marshal data, err: %v", err)
+		zlog.LogErrorf("cannot marshal data")
 		return fuyaoerrors.ErrFailToMarshalData
 	}
 	values[constants.UserExtra] = jsonExtra
@@ -563,7 +571,7 @@ func isValidThenURL(uri string) bool {
 func readBase64Image(filePath string) (string, error) {
 	imageData, err := os.ReadFile(filePath)
 	if err != nil {
-		zlog.LogErrorf("failed to read image file: %v", err)
+		zlog.LogErrorf("failed to read image file")
 		return "", err
 	}
 
@@ -587,7 +595,7 @@ func generateSessionID(length int) (string, error) {
 	for i := 0; i < length; i++ {
 		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
-			zlog.LogErrorf("Cannot generate random char, err: %v", err)
+			zlog.LogErrorf("Cannot generate random char")
 			return "", err
 		}
 		sessionID[i] = charset[num.Int64()]

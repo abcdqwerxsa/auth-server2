@@ -99,7 +99,7 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 			`
 			_, err := w.Write([]byte(htmlContent))
 			if err != nil {
-				zlog.LogErrorf("cannot write html content, err: %s", err)
+				zlog.LogErrorf("cannot write html content")
 			}
 		})))
 	loginRouter := s.Router.PathPrefix(constants.FuyaoLoginEndpoint).Subrouter()
@@ -124,7 +124,9 @@ func (s *OAuthServerAPIServer) Run(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		err := s.Server.Shutdown(shutdownCtx)
-		zlog.LogErrorf("server shuts down, err: %v", err)
+		if err != nil {
+			zlog.LogErrorf("server shuts down errors")
+		}
 	}()
 
 	zlog.LogInfof("Start listening on %s", s.Server.Addr)

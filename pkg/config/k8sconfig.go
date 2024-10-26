@@ -92,10 +92,10 @@ func GetKubeConfigOrInClusterConfig(k8sConfig *KubernetesConfig) (clientConfig *
 		zlog.LogWarn("Get KubeConfig In Cluster Config error, Attempting to obtain from the default config file")
 		kubeConfigFile := getDefaultKubeConfigFile()
 		if kubeConfigFile == "" {
-			zlog.LogFatalf("Error creating in-cluster config: %v", err)
+			zlog.LogFatalf("Error creating in-cluster config")
 		}
 		if _, err = os.Stat(kubeConfigFile); err != nil {
-			zlog.LogFatalf("Error creating in-filePath config: %v", err)
+			zlog.LogFatalf("Error creating in-filePath config")
 		}
 		clientConfig, err = clientcmd.BuildConfigFromFlags("", kubeConfigFile)
 		if err != nil {

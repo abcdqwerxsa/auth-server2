@@ -23,26 +23,26 @@ import (
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
-// Auditor defines the user operation auditor
-type Auditor struct {
+// OAuthAuditor defines the user operation auditor
+type OAuthAuditor struct {
 	Logger *zap.SugaredLogger
 }
 
 var (
-	instance *Auditor
+	instance *OAuthAuditor
 	once     sync.Once
 )
 
-// NewAuditor 初始化 Auditor，并确保只创建一个实例
-func NewAuditor() *Auditor {
+// NewAuditor 初始化 OAuthAuditor，并确保只创建一个实例
+func NewAuditor() *OAuthAuditor {
 	once.Do(func() {
-		instance = &Auditor{Logger: zlog.GetLogger(zlog.GetDefaultAuditConf())}
+		instance = &OAuthAuditor{Logger: zlog.GetLogger(zlog.GetAuditConf())}
 	})
 	return instance
 }
 
 // LogSucceedOperation audit succeed operations
-func (a *Auditor) LogSucceedOperation(username, action string, req *http.Request) {
+func (a *OAuthAuditor) LogSucceedOperation(username, action string, req *http.Request) {
 	sourceIP := utils.GetIPAddress(req)
 	userAgent := req.Header.Get("User-Agent")
 	timeStamp := time.Now().Format("2006-01-02T15:04:05Z")
@@ -52,7 +52,7 @@ func (a *Auditor) LogSucceedOperation(username, action string, req *http.Request
 }
 
 // LogFailOperation audit failed operations
-func (a *Auditor) LogFailOperation(username, action, reason string, req *http.Request) {
+func (a *OAuthAuditor) LogFailOperation(username, action, reason string, req *http.Request) {
 	sourceIP := utils.GetIPAddress(req)
 	userAgent := req.Header.Get("User-Agent")
 	timeStamp := time.Now().Format("2006-01-02T15:04:05Z")

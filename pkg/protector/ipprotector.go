@@ -16,9 +16,11 @@ package protector
 import (
 	"container/list"
 	"math"
+	"strconv"
 	"time"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -86,7 +88,7 @@ func (p *LoginIPProtector) Unlock(ip string) bool {
 }
 
 // CheckLocked checks whether ip is locked and return the remaining locked time if it's locked
-func (p *LoginIPProtector) CheckLocked(ip string) (bool, int64) {
+func (p *LoginIPProtector) CheckLocked(ip string) (bool, string) {
 	// first make sure the ip-tracker exists
 	p.ensureExistence(ip)
 
@@ -94,10 +96,11 @@ func (p *LoginIPProtector) CheckLocked(ip string) (bool, int64) {
 	isLocked := p.ipProtector[ip].locked && p.ipProtector[ip].lockTime.Add(p.LockDuration).After(time.Now())
 	if isLocked {
 		remainingTime := math.Ceil(p.ipProtector[ip].lockTime.Add(p.LockDuration).Sub(time.Now()).Minutes())
-		return true, int64(remainingTime)
+		remainingTimeString := strconv.FormatInt(int64(remainingTime), constants.Decimal)
+		return true, remainingTimeString
 	}
 
-	return false, 0
+	return false, "0"
 }
 
 func (p *LoginIPProtector) squeezeTracker(ip string) {

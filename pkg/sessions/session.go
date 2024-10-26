@@ -50,7 +50,7 @@ func (s *CookieStore) Get(r *http.Request) Values {
 
 	if err != nil {
 		// just log the error so that we can know what is going on
-		zlog.LogErrorf("failed to decode secure cookie session %s: %v", s.name, err)
+		zlog.LogError("failed to decode secure cookie session")
 
 		return make(Values)
 	}
@@ -152,7 +152,7 @@ func (v Values) SetLoggedIn() bool {
 	// serialize extra (map[string][]string)
 	jsonExtra, err := json.Marshal(extras)
 	if err != nil {
-		zlog.LogErrorf("cannot marshal data, err: %v", err)
+		zlog.LogError("cannot marshal data")
 		return false
 	}
 	v[constants.UserExtra] = jsonExtra
