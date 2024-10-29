@@ -46,6 +46,12 @@ spec:
               mountPath: /config.json
             - name: log-path
               mountPath: /var/log/oauth-server
+            - name: log-config-volume
+              readOnly: true
+              mountPath: /etc/oauth-server/log-config
+            - name: audit-log-config-volume
+              readOnly: true
+              mountPath: /etc/oauth-server/audit-log-config
           {{- if .Values.resources }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
@@ -58,3 +64,11 @@ spec:
           hostPath:
             path: /var/log/oauth-server
             type: DirectoryOrCreate
+        - name: log-config-volume
+          configMap:
+            defaultMode: 0600
+            name: oauth-server-logcfg
+        - name: audit-log-config-volume
+          configMap:
+            defaultMode: 0600
+            name: oauth-server-audit-logcfg

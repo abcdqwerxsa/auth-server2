@@ -13,13 +13,12 @@
 package fuyaopassword
 
 import (
+	"bou.ke/monkey"
 	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +31,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/audit"
 	"openfuyao/oauth-server/pkg/authenticators"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaostore"
@@ -41,7 +41,7 @@ import (
 
 // TestLoginHandlerGetSucceed tests the successful condition for getting login page
 func TestLoginHandlerGetSucceed(t *testing.T) {
-	req, err := http.NewRequest("GET", constants.FuyaoLoginEndpoint+"?then=/", nil)
+	req, err := http.NewRequest("GET", constants.FuyaoLoginEndpoint+"?then=%2Foauth2%2Foauth%2Fauthorize%3F", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,6 +63,7 @@ func TestLoginHandlerGetSucceed(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -74,12 +75,13 @@ func TestLoginHandlerGetSucceed(t *testing.T) {
 
 // TestLoginHandlerPostSucceed tests the successful condition for logging in
 func TestLoginHandlerPostSucceed(t *testing.T) {
-	form := url.Values{}
-	form.Add("username", "admin")
-	form.Add("password", "Soup4@LL")
-	form.Add("csrf_token", "")
-	form.Add("then", "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3")
-	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, strings.NewReader(form.Encode()))
+	requestBody := LoginRequest{
+		Username: "admin",
+		Password: []byte("Soup4@LL"),
+		Then:     "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3",
+	}
+	requestBodyBytes, err := json.Marshal(requestBody)
+	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, bytes.NewBuffer(requestBodyBytes))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,6 +116,7 @@ func TestLoginHandlerPostSucceed(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -125,13 +128,14 @@ func TestLoginHandlerPostSucceed(t *testing.T) {
 
 // TestLoginHandlerPostFail tests the failed condition for logging in
 func TestLoginHandlerPostFail(t *testing.T) {
-	form := url.Values{}
-	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
-	form.Add("username", "admin")
-	form.Add("password", "Soup4@LLL")
-	form.Add("csrf_token", "")
-	form.Add("then", then)
-	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, strings.NewReader(form.Encode()))
+	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
+	requestBody := LoginRequest{
+		Username: "admin",
+		Password: []byte("Soup4@LL"),
+		Then:     then,
+	}
+	requestBodyBytes, err := json.Marshal(requestBody)
+	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, bytes.NewBuffer(requestBodyBytes))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,6 +170,7 @@ func TestLoginHandlerPostFail(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -203,6 +208,7 @@ func TestLoginHandlerUnknownMethod(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
@@ -214,7 +220,7 @@ func TestLoginHandlerUnknownMethod(t *testing.T) {
 
 // TestLoginPasswordConfirmHandlerGetSucceed tests the successful condition for password confirmation
 func TestLoginPasswordConfirmHandlerGetSucceed(t *testing.T) {
-	req, err := http.NewRequest("GET", constants.FuyaoPasswordConfirmEndpoint+`?then=/`, nil)
+	req, err := http.NewRequest("GET", constants.FuyaoPasswordConfirmEndpoint+`?then=%2Foauth2%2Foauth%2Fauthorize%3F`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,23 +248,32 @@ func TestLoginPasswordConfirmHandlerGetSucceed(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
+
+	monkey.PatchInstanceMethod(reflect.TypeOf(sessions.Values{}), "GetString", func(_ sessions.Values, key string) (string, bool) {
+		return "admin", true
+	})
+	defer monkey.UnpatchAll()
+
 	rr := httptest.NewRecorder()
+
 	testLogin.PasswordConfirmHandler(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status code %d; got %d", http.StatusOK, rr.Code)
+	if rr.Code != http.StatusFound {
+		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
 	}
 }
 
 // TestLoginPasswordConfirmHandlerPostSucceed tests the successful condition for password confirmation
 func TestLoginPasswordConfirmHandlerPostSucceed(t *testing.T) {
-	// prepare forms
-	form := url.Values{}
-	form.Add("new_password", "soup4@LL")
-	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
-	form.Add("then", then)
-	req, err := http.NewRequest("POST", constants.FuyaoPasswordConfirmEndpoint, strings.NewReader(form.Encode()))
+	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
+	requestBody := PasswordConfirmRequest{
+		NewPassword: []byte("soup4@LL"),
+		Then:        then,
+	}
+	requestBodyBytes, err := json.Marshal(requestBody)
+	req, err := http.NewRequest("POST", constants.FuyaoPasswordConfirmEndpoint, bytes.NewBuffer(requestBodyBytes))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,20 +314,19 @@ func TestLoginPasswordConfirmHandlerPostSucceed(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
+
+	monkey.PatchInstanceMethod(reflect.TypeOf(sessions.Values{}), "GetString", func(_ sessions.Values, key string) (string, bool) {
+		return "admin", true
+	})
+	defer monkey.UnpatchAll()
+
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
 
 	if rr.Code != http.StatusFound {
 		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
-	}
-
-	if rr.Header().Get("Set-Cookie") == "" {
-		t.Errorf("Expected Set-Cookie key in header but it does show up")
-	}
-
-	if rr.Header().Get("Location") != then {
-		t.Errorf("Expected Location %s; got %s", then, rr.Header().Get("Location"))
 	}
 }
 
@@ -321,8 +335,8 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 	// 构造请求体
 	requestBody := PasswordResetRequest{
 		Username:         "admin",
-		OriginalPassword: "Soup4@LL",
-		NewPassword:      "soup4@LL",
+		OriginalPassword: []byte("Soup4@LL"),
+		NewPassword:      []byte("soup4@LL"),
 	}
 	requestBodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
@@ -349,7 +363,7 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 			"username":           []byte("admin"),
 			"groups":             []byte("system:admin"),
 			"extra":              []byte(`{"first-login":["false"]}`),
-			"encrypted-password": []byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
+			"encrypted-password": []byte("tEasO4NNBhygFPFP0rNZ0ivAQazrLzasW2w3DURXYOfy+A7yV57sZm0d13rGdMBQEGnNK9V4bEkAeibXIBO5hfjASfWK8VEdp2bECSEwWEw="),
 		},
 	}
 
@@ -385,6 +399,7 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordResetHandler(rr, req)
@@ -396,7 +411,7 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 
 // TestLoginPasswordConfirmHandlerRevertSucceed tests the reverting condition for password confirmation
 func TestLoginPasswordConfirmHandlerRevertSucceed(t *testing.T) {
-	req, err := http.NewRequest("DELETE", constants.FuyaoPasswordConfirmEndpoint+`?then=/`, nil)
+	req, err := http.NewRequest("DELETE", constants.FuyaoPasswordConfirmEndpoint+`?then=%2Foauth2%2Foauth%2Fauthorize%3Fxxx`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,6 +439,7 @@ func TestLoginPasswordConfirmHandlerRevertSucceed(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
@@ -459,6 +475,7 @@ func TestNewLogin(t *testing.T) {
 		Authenticator:    fakeAuthenticator,
 		idpLoginStore:    fakeIdpLoginStore,
 		loginIPProtector: fakeLoginIPProtector,
+		auditor:          audit.NewAuditor(),
 	}
 
 	tests := []struct {

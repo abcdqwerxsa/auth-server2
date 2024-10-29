@@ -16,6 +16,7 @@ package options
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,12 +57,12 @@ func (o *OAuthServerOption) ReadConfig() (*config.OAuthServerAPIServerConfig, er
 	v := viper.New()
 	v.SetConfigFile(o.ConfigFile)
 	if err := v.ReadInConfig(); err != nil {
-		return nil, err
+		return nil, errors.New("cannot read oauth-server config")
 	}
 
 	var oAuthServerConfig config.OAuthServerAPIServerConfig
 	if err := v.Unmarshal(&oAuthServerConfig); err != nil {
-		return nil, err
+		return nil, errors.New("cannot unmarshal oauth-server config")
 	}
 
 	// oAuthServerConfig.K8sConfig is allowed to be nil since we will read from incluster config / default path
@@ -104,7 +105,7 @@ func readDataFromK8sSecret(k8sClient kubernetes.Interface, key string) ([]byte, 
 
 	rawData, err := base64.StdEncoding.DecodeString(string(b64Data))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error decoding base64 data")
 	}
 
 	return rawData, nil

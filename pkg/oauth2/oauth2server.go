@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/audit"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/fuyaostore"
@@ -63,6 +64,8 @@ type FuyaoAuthorizeServer struct {
 	oauthProxyStore map[string]map[string]string
 	// authCode2SessionID maps each auth-code to the central sessionID
 	authCode2SessionID map[string]string
+	// auditor
+	auditor *audit.OAuthAuditor
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer
@@ -78,6 +81,7 @@ func NewFuyaoAuthorizeServer(
 		tokenStore:         tokenStore,
 		oauthProxyStore:    make(map[string]map[string]string),
 		authCode2SessionID: make(map[string]string),
+		auditor:            audit.NewAuditor(),
 	}
 }
 
@@ -229,7 +233,7 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 	if err != nil {
 		// delete expired authorization code
 		if delErr := s.deleteExpiredAuthCode(tgr); delErr != nil {
-			zlog.LogErrorf("delete expired auth code goes wrong: err: %v", delErr)
+			zlog.LogErrorf("delete expired auth code goes wrong")
 		}
 		s.generateTokenError(w, err)
 		return
@@ -335,7 +339,7 @@ func isValidRedirectURI(s string) bool {
 	regexPattern := `^/rest/auth/callback$`
 	match, err := regexp.MatchString(regexPattern, s)
 	if err != nil {
-		zlog.LogErrorf("Error compiling regex:", err)
+		zlog.LogErrorf("Error compiling regex")
 		return false
 	}
 	if !match {
@@ -365,7 +369,7 @@ func (s *FuyaoAuthorizeServer) AuthorizeThroughSession(
 	// the session is broken, flush it
 	if !ok1 || !ok2 || !ok3 || !ok4 {
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+			zlog.LogErrorf("cannot delete the loginstore used in authorization")
 			return nil, constants.LoginFailed, err
 		}
 		return nil, constants.LoginFailed, nil
@@ -393,7 +397,7 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 	ti, err := s.tokenStore.GetByCode(code)
 
 	if err != nil {
-		zlog.LogErrorf("cannot get auth code, err: %v", err)
+		zlog.LogErrorf("cannot get auth code")
 		return err
 	}
 	if ti != nil && ti.GetCodeCreateAt().Add(ti.GetCodeExpiresIn()).Before(time.Now()) {
@@ -425,9 +429,10 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		zlog.LogWarn("the oauth-server cookie does not contain web-oauthserver sessionid")
 		// flush the loginState
 		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+			zlog.LogErrorf("cannot delete the loginstore used in authorization")
 		}
 		// we only log the error, the logout needs to proceed
+		s.auditor.LogSucceedOperation("admin", "logout", r)
 		httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
 		return
 	}
@@ -441,7 +446,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		// 创建 POST 请求
 		req, err := http.NewRequest("POST", proxyEndpoint, strings.NewReader(formData.Encode()))
 		if err != nil {
-			zlog.LogErrorf("Failed to create request: %v", err)
+			zlog.LogErrorf("Failed to create request")
 		}
 		zlog.LogInfof("send logout request to %s", proxyEndpoint)
 
@@ -455,20 +460,20 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		client.Transport = transport
 		resp, err := client.Do(req)
 		if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
-			zlog.LogErrorf("Failed to dispatch logout requests to oauth-proxies, err: %v", err)
+			zlog.LogErrorf("Failed to dispatch logout requests to oauth-proxies")
 		}
 	}
 
 	// flush the loginState
 	if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-		zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
+		s.auditor.LogFailOperation("admin", "logout", "cannot delete the loginstore cookie", r)
 		httpserver.RespondWithStatusMsg(w, http.StatusInternalServerError, 0, err.Error())
 		return
 	}
 	delete(s.oauthProxyStore, oauthServerSessionID)
 	// flush the gorilla.csrf
 	clearCSRFCookie(w)
-	zlog.LogInfof("Logout succeed for user")
+	s.auditor.LogSucceedOperation("admin", "logout", r)
 
 	// no content to return
 	httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
@@ -478,7 +483,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 // belows are private functions
 func (s *FuyaoAuthorizeServer) wrapReturnErrorHandler(w http.ResponseWriter, err error) {
 	if err != nil {
-		zlog.LogErrorf("fail when writing error back to the http response header, err: %v", err)
+		zlog.LogErrorf("fail when writing error back to the http response header")
 		http.Error(w, fuyaoerrors.ErrStrWritingHttpHeader, http.StatusInternalServerError)
 		return
 	}
@@ -492,7 +497,7 @@ func (s *FuyaoAuthorizeServer) redirectAuthorizationCode(
 ) {
 	uri, err := s.GetRedirectURI(&req.AuthorizeRequest, data)
 	if err != nil {
-		zlog.LogErrorf("%s, err: %s", fuyaoerrors.ErrStrRedirectURIMissing, err)
+		zlog.LogErrorf("%s", fuyaoerrors.ErrStrRedirectURIMissing)
 		http.Error(w, fuyaoerrors.ErrStrRedirectURIMissing, fuyaoerrors.ErrStatusCode[fuyaoerrors.ErrRedirectURIMissing])
 		return
 	}
@@ -542,7 +547,7 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	w.WriteHeader(status)
 	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
-		zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToMarshalData, err)
+		zlog.LogErrorf("%s", fuyaoerrors.ErrStrFailToMarshalData)
 	}
 
 	return

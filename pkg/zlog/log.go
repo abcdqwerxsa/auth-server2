@@ -28,10 +28,11 @@ import (
 )
 
 const (
-	defaultConfigPath = "/etc/oauth-server"
-	defaultConfigName = "oauth-server"
-	defaultConfigType = "yaml"
-	defaultLogPath    = "/var/log/oauth-server"
+	defaultConfigPath      = "/etc/oauth-server/log-config"
+	defaultAuditConfigPath = "/etc/oauth-server/audit-log-config"
+	defaultConfigName      = "oauth-server"
+	defaultConfigType      = "yaml"
+	defaultLogPath         = "/var/log/oauth-server"
 )
 
 // Logger is the overall logging component
@@ -63,23 +64,24 @@ type LogConfig struct {
 func init() {
 	var conf *LogConfig
 	var err error
-	if conf, err = loadConfig(); err != nil {
-		fmt.Printf("loadConfig fail err is %v. use DefaultConf\n", err)
+	if conf, err = loadConfig(defaultConfigPath); err != nil {
+		fmt.Printf("loadConfig fail err. use DefaultConf\n")
 		conf = getDefaultConf()
 	}
 	Logger = GetLogger(conf)
 }
 
-func loadConfig() (*LogConfig, error) {
-	viper.AddConfigPath(defaultConfigPath)
-	viper.SetConfigName(defaultConfigName)
-	viper.SetConfigType(defaultConfigType)
+func loadConfig(configPath string) (*LogConfig, error) {
+	viperInstance := viper.New()
+	viperInstance.AddConfigPath(configPath)
+	viperInstance.SetConfigName(defaultConfigName)
+	viperInstance.SetConfigType(defaultConfigType)
 
-	config, err := parseConfig()
+	config, err := parseConfig(viperInstance)
 	if err != nil {
 		return nil, err
 	}
-	watchConfig()
+	watchConfig(viperInstance)
 	return config, nil
 }
 
@@ -88,7 +90,7 @@ func getDefaultConf() *LogConfig {
 		Level:       "info",
 		EncoderType: "console",
 		Path:        defaultLogPath,
-		FileName:    "oauth-server.log",
+		FileName:    "console.log",
 		MaxSize:     20,
 		MaxBackups:  5,
 		MaxAge:      30,
@@ -106,6 +108,32 @@ func getDefaultConf() *LogConfig {
 	return defaultConf
 }
 
+func getDefaultAuditConf() *LogConfig {
+	return &LogConfig{
+		Level:       "info",
+		EncoderType: "console",
+		Path:        defaultLogPath,
+		FileName:    "audit.log",
+		MaxSize:     20,
+		MaxBackups:  5,
+		MaxAge:      30,
+		LocalTime:   false,
+		Compress:    true,
+		OutMod:      "both",
+	}
+}
+
+// GetAuditConf inits the default audit config
+func GetAuditConf() *LogConfig {
+	var conf *LogConfig
+	var err error
+	if conf, err = loadConfig(defaultAuditConfigPath); err != nil {
+		fmt.Printf("loadAuditConfig fail err. use DefaultAuditConf\n")
+		conf = getDefaultAuditConf()
+	}
+	return conf
+}
+
 // GetLogger inits the logger by config
 func GetLogger(conf *LogConfig) *zap.SugaredLogger {
 	writeSyncer := getLogWriter(conf)
@@ -119,14 +147,14 @@ func GetLogger(conf *LogConfig) *zap.SugaredLogger {
 	return logger.Sugar()
 }
 
-func watchConfig() {
+func watchConfig(viper *viper.Viper) {
 	// 监听配置文件的变化
 	watchOnce.Do(func() {
 		viper.WatchConfig()
 		viper.OnConfigChange(func(e fsnotify.Event) {
 			Logger.Warn("Config file changed")
 			// 重新加载配置
-			conf, err := parseConfig()
+			conf, err := parseConfig(viper)
 			if err != nil {
 				Logger.Warnf("Error reloading config file: %v\n", err)
 			} else {
@@ -136,7 +164,7 @@ func watchConfig() {
 	})
 }
 
-func parseConfig() (*LogConfig, error) {
+func parseConfig(viper *viper.Viper) (*LogConfig, error) {
 	err := viper.ReadInConfig()
 	if err != nil {
 		return nil, err

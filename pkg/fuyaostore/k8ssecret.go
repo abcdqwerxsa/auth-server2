@@ -16,6 +16,7 @@ package fuyaostore
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -71,7 +72,7 @@ func (s *K8sSecretStore) createByCode(info oauth2.TokenInfo) error {
 	// serialize the info
 	data, err := json.Marshal(info)
 	if err != nil {
-		return err
+		return errors.New("cannot marshal data")
 	}
 
 	// save the info to secret

@@ -38,7 +38,7 @@ func RespondWithStatusMsg(w http.ResponseWriter, statusCode int, errCode int32, 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	if err := json.NewEncoder(w).Encode(errResponse); err != nil {
-		zlog.LogErrorf("failed to encode json, err: %v", err)
+		zlog.LogErrorf("failed to encode json")
 	}
 	return
 }
