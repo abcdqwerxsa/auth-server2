@@ -51,9 +51,10 @@ func AccessLoggingMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "connect-src 'self' https:;")
+		w.Header().Set("Content-Security-Policy", "connect-src 'self' https:;frame-ancestors 'none';object-src 'none'")
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		w.Header().Set("Permission-Policy", "geolocation=()")
 
 		// Create a new responseLogger
 		rl := &responseLogger{
