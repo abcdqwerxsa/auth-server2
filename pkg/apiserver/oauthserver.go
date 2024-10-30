@@ -94,7 +94,7 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 			}
 			then := requestBody.Then
 
-			encodedErrString := "您的登陆cookie已经过期，请重新登录"
+			encodedErrString := "您的登录cookie已经过期，请重新登录"
 			encodedThen := url.QueryEscape(then)
 			redirect := fmt.Sprintf("%s?then=%s&error=%s", r.URL.String(), encodedThen, encodedErrString)
 
