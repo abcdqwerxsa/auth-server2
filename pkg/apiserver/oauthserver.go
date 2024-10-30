@@ -15,7 +15,10 @@ package apiserver
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
@@ -23,6 +26,7 @@ import (
 	overallconfigs "openfuyao/oauth-server/cmd/oauth-server/app/config"
 	"openfuyao/oauth-server/pkg/config"
 	"openfuyao/oauth-server/pkg/constants"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/fuyaostore"
 	"openfuyao/oauth-server/pkg/httpserver"
 	"openfuyao/oauth-server/pkg/idp/fuyaopassword"
@@ -83,25 +87,19 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	CSRF := csrf.Protect(s.Cfg.IDPLoginStoreConfig.EncryptionKey, csrf.SameSite(csrf.SameSiteStrictMode),
 		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(s.Cfg.IDPLoginStoreConfig.SessionMaxAge),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusForbidden)
-			htmlContent := `
-				<!DOCTYPE html>
-				<head>
-					<meta charset="UTF-8">
-					<title>OpenFuyao</title>
-				</head>
-				<body>
-					<h1>CSRF Token 过期</h1>
-					<p>您的登陆cookie已经过期</p>
-					<a href="/">点击此处重新登陆openFuyao平台</a>
-				</body>
-				</html>
-			`
-			_, err := w.Write([]byte(htmlContent))
-			if err != nil {
-				zlog.LogErrorf("cannot write html content, err: %s", err)
+			var requestBody fuyaopassword.LoginRequest
+			if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+				httpserver.RespondWithStatusMsg(w, http.StatusBadRequest, 0, fuyaoerrors.ErrStrFailToUnmarshalData)
+				return
 			}
+			then := requestBody.Then
+
+			encodedErrString := "您的登录cookie已经过期，请重新登录"
+			encodedThen := url.QueryEscape(then)
+			redirect := fmt.Sprintf("%s?then=%s&error=%s", r.URL.String(), encodedThen, encodedErrString)
+
+			// redirect to GET handleLogin
+			http.Redirect(w, r, redirect, http.StatusFound)
 		})))
 	loginRouter := s.Router.PathPrefix(constants.FuyaoLoginEndpoint).Subrouter()
 	confirmRouter := s.Router.PathPrefix(constants.FuyaoPasswordConfirmEndpoint).Subrouter()
