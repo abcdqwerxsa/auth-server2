@@ -15,13 +15,11 @@ package fuyaopassword
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
-	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -517,11 +515,6 @@ func (l *Login) saveLoginStateToSession(user user.Info, w http.ResponseWriter) e
 	// serialize extra (map[string][]string)
 	extra := user.GetExtra()
 
-	// add the web-oauthserver session-id
-	const sessionIDLength = 32
-	sessionID, err := generateSessionID(sessionIDLength)
-	extra[constants.OAuthServerSessionID] = []string{sessionID}
-
 	// save the extra information
 	jsonExtra, err := json.Marshal(extra)
 	if err != nil {
@@ -537,21 +530,6 @@ func destroyBytes(bt []byte) {
 	for i := range bt {
 		bt[i] = 0
 	}
-}
-
-func isServerRelatedURL(uri string) bool {
-	// check whether it is empty
-	if len(uri) == 0 {
-		return false
-	}
-
-	// check whether it follows url pattern
-	u, err := url.Parse(uri)
-	if err != nil {
-		return false
-	}
-
-	return strings.HasPrefix(u.Path, "/") && len(u.Scheme) == 0 && len(u.Host) == 0
 }
 
 func isValidThenURL(uri string) bool {
@@ -586,20 +564,4 @@ func redirectGetMethodWithError(w http.ResponseWriter, r *http.Request, errStrin
 
 	// redirect to GET handleLogin
 	http.Redirect(w, r, redirect, http.StatusFound)
-}
-
-func generateSessionID(length int) (string, error) {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	sessionID := make([]byte, length)
-
-	for i := 0; i < length; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		if err != nil {
-			zlog.LogErrorf("Cannot generate random char")
-			return "", err
-		}
-		sessionID[i] = charset[num.Int64()]
-	}
-
-	return string(sessionID), nil
 }

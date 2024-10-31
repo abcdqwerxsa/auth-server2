@@ -30,21 +30,15 @@ import (
 
 // ServerOptions defines the config for httpserver
 type ServerOptions struct {
-	HttpPort          int    `json:"HttpPort"`
-	HttpsPort         int    `json:"HttpsPort"`
-	TlsCertFile       string `json:"TlsCertFile"`
-	TlsPrivateKeyFile string `json:"TlsPrivateKeyFile"`
-	RootCAFile        string `json:"RootCAFile"`
+	HttpPort  int `json:"HttpPort"`
+	HttpsPort int `json:"HttpsPort"`
 }
 
 // NewDefaultHttpServerOptions inits the default httpserver option
 func NewDefaultHttpServerOptions() *ServerOptions {
 	return &ServerOptions{
-		HttpPort:          9095,
-		HttpsPort:         0,
-		TlsCertFile:       "",
-		TlsPrivateKeyFile: "",
-		RootCAFile:        "",
+		HttpPort:  9095,
+		HttpsPort: 0,
 	}
 }
 
