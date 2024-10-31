@@ -14,7 +14,6 @@
 package oauth2
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -194,28 +193,8 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 		req.RedirectURI = client.GetDomain()
 	}
 
-	// store the map from auth-code to oauth-server sessionID for single sign out
-	s.storeToCodeSessionIDMapper(r, ti)
-
 	// finally we redirect to the client callback interface
 	s.redirectAuthorizationCode(w, req, s.GetAuthorizeData(req.ResponseType, ti))
-	return
-}
-
-func (s *FuyaoAuthorizeServer) storeToCodeSessionIDMapper(r *http.Request, ti oauth2.TokenInfo) {
-	// fetch auth-code
-	code := ti.GetCode()
-
-	// fetch the cached user info
-	cookieData := s.idpLoginStore.Get(r)
-	sessionArray, ok := cookieData.GetExtraByKey(constants.OAuthServerSessionID)
-	if !ok {
-		zlog.LogWarn("the oauth-server cookie does not contain web-oauthserver sessionid")
-		return
-	}
-	oauthServerSessionID := sessionArray[0]
-
-	s.authCode2SessionID[code] = oauthServerSessionID
 	return
 }
 
@@ -226,8 +205,6 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 		s.generateTokenError(w, err)
 		return
 	}
-
-	s.registerOauthProxyComponents(r)
 
 	ti, err := s.GetAccessToken(gt, tgr)
 	if err != nil {
@@ -241,31 +218,6 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 
 	s.returnAccessToken(w, s.GetTokenData(ti), nil)
 
-	return
-}
-
-func (s *FuyaoAuthorizeServer) registerOauthProxyComponents(r *http.Request) {
-	// fetch the component sessionID parameter
-	sessionID := r.FormValue(constants.SessionIDParam)
-	proxyLogoutEndpoint := r.FormValue(constants.LogoutEndpointParam)
-	code := r.FormValue(constants.CodeParam)
-	if sessionID == "" || proxyLogoutEndpoint == "" {
-		zlog.LogWarn("request does not have the session_id or logout endpoint parameter for single logout")
-		return
-	}
-
-	// fetch the idpLogin sessionID
-	oauthServerSessionID, ok := s.authCode2SessionID[code]
-	if !ok {
-		zlog.LogWarn("cannot find the corresponding sessionID for code")
-		return
-	}
-	delete(s.authCode2SessionID, code)
-
-	if _, ok = s.oauthProxyStore[oauthServerSessionID]; !ok {
-		s.oauthProxyStore[oauthServerSessionID] = make(map[string]string)
-	}
-	s.oauthProxyStore[oauthServerSessionID][sessionID] = proxyLogoutEndpoint
 	return
 }
 
@@ -423,46 +375,6 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 	if redirectURI == "" {
 		redirectURI = constants.FuyaoLoginEndpoint
 	}
-	cookieData := s.idpLoginStore.Get(r)
-	sessionArray, ok := cookieData.GetExtraByKey(constants.OAuthServerSessionID)
-	if !ok {
-		zlog.LogWarn("the oauth-server cookie does not contain web-oauthserver sessionid")
-		// flush the loginState
-		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-			zlog.LogErrorf("cannot delete the loginstore used in authorization")
-		}
-		// we only log the error, the logout needs to proceed
-		s.auditor.LogSucceedOperation("admin", "logout", r)
-		httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
-		return
-	}
-	oauthServerSessionID := sessionArray[0]
-
-	// dispatch one by one
-	for sessionID, proxyEndpoint := range s.oauthProxyStore[oauthServerSessionID] {
-		formData := url.Values{}
-		formData.Set(constants.SessionIDParam, sessionID)
-
-		// 创建 POST 请求
-		req, err := http.NewRequest("POST", proxyEndpoint, strings.NewReader(formData.Encode()))
-		if err != nil {
-			zlog.LogErrorf("Failed to create request")
-		}
-		zlog.LogInfof("send logout request to %s", proxyEndpoint)
-
-		// 设置请求头，如果需要其他头部信息，可以在这里添加
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		// 发送请求
-		client := &http.Client{}
-		transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true,
-			MinVersion: tls.VersionTLS13}}
-		client.Transport = transport
-		resp, err := client.Do(req)
-		if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
-			zlog.LogErrorf("Failed to dispatch logout requests to oauth-proxies")
-		}
-	}
 
 	// flush the loginState
 	if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
@@ -470,7 +382,6 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		httpserver.RespondWithStatusMsg(w, http.StatusInternalServerError, 0, err.Error())
 		return
 	}
-	delete(s.oauthProxyStore, oauthServerSessionID)
 	// flush the gorilla.csrf
 	clearCSRFCookie(w)
 	s.auditor.LogSucceedOperation("admin", "logout", r)
