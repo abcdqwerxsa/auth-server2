@@ -15,8 +15,11 @@ package fuyaostore
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"time"
 
@@ -75,10 +78,16 @@ func (s *K8sSecretStore) createByCode(info oauth2.TokenInfo) error {
 		return errors.New("cannot marshal data")
 	}
 
+	// generate auth code name
+	authNameID, err := generateRandomName()
+	if err != nil {
+		return errors.New("generate auth-code name failed")
+	}
+
 	// save the info to secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.CodePrefix + info.GetCode(),
+			Name:      constants.CodePrefix + authNameID,
 			Namespace: s.ns,
 		},
 		Data: map[string][]byte{
@@ -113,8 +122,29 @@ func (s *K8sSecretStore) createByRefresh(info oauth2.TokenInfo) error {
 
 // RemoveByCode removes the auth-code
 func (s *K8sSecretStore) RemoveByCode(code string) error {
-	name := constants.CodePrefix + code
-	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), name, metav1.DeleteOptions{})
+	codeList, err := s.k8sClient.CoreV1().Secrets(s.ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var target *corev1.Secret
+	for _, codeItem := range codeList.Items {
+		info, err := s.decodeUserInfo(codeItem.Data["userinfo"])
+		if err != nil {
+			continue
+		}
+		if info.GetCode() == code {
+			target = &codeItem
+			break
+		}
+	}
+
+	if target == nil {
+		zlog.LogErrorf("cannot delete access-token secret")
+		return fuyaoerrors.ErrFailToDeleteSecret
+	}
+
+	err = s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), target.Name, metav1.DeleteOptions{})
 	if err != nil {
 		zlog.LogErrorf("cannot delete auth-code secret")
 		return fuyaoerrors.ErrFailToDeleteSecret
@@ -125,14 +155,7 @@ func (s *K8sSecretStore) RemoveByCode(code string) error {
 
 // RemoveByAccess removes the access-token
 func (s *K8sSecretStore) RemoveByAccess(access string) error {
-	name := refactorSecretName(constants.AccessPrefix + access)
-	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), name, metav1.DeleteOptions{})
-	if err != nil {
-		zlog.LogErrorf("cannot delete access-token secret")
-		return fuyaoerrors.ErrFailToDeleteSecret
-	}
-
-	return nil
+	return fuyaoerrors.ErrNotImplemented
 }
 
 // RemoveByRefresh removes the refresh-token
@@ -142,30 +165,28 @@ func (s *K8sSecretStore) RemoveByRefresh(refresh string) error {
 
 // GetByCode gets the auth-code data
 func (s *K8sSecretStore) GetByCode(code string) (oauth2.TokenInfo, error) {
-	// get the secret
-	name := constants.CodePrefix + code
-	userdata, err := s.k8sClient.CoreV1().Secrets(s.ns).Get(context.Background(), name, metav1.GetOptions{})
+	codeList, err := s.k8sClient.CoreV1().Secrets(s.ns).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot get auth-code secret")
-		return nil, fuyaoerrors.ErrFailToGetSecret
+		return nil, err
 	}
 
-	// unmarshal to data
-	return s.decodeUserInfo(userdata.Data["userinfo"])
+	for _, codeItem := range codeList.Items {
+		info, err := s.decodeUserInfo(codeItem.Data["userinfo"])
+		if err != nil {
+			continue
+		}
+		if info.GetCode() == code {
+			return info, nil
+		}
+	}
+
+	zlog.LogErrorf("cannot get auth-code secret")
+	return nil, fuyaoerrors.ErrFailToGetSecret
 }
 
 // GetByAccess gets the access-token data
 func (s *K8sSecretStore) GetByAccess(access string) (oauth2.TokenInfo, error) {
-	// get the secret
-	name := refactorSecretName(constants.AccessPrefix + access)
-	userdata, err := s.k8sClient.CoreV1().Secrets(s.ns).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		zlog.LogErrorf("cannot get access-token secret")
-		return nil, fuyaoerrors.ErrFailToGetSecret
-	}
-
-	// unmarshal to data
-	return s.decodeUserInfo(userdata.Data["userinfo"])
+	return nil, fuyaoerrors.ErrNotImplemented
 }
 
 // GetByRefresh gets the refresh-token data
@@ -189,4 +210,15 @@ func refactorSecretName(data string) string {
 	lowerData = strings.ReplaceAll(lowerData, ".", "")
 	lowerData = strings.ReplaceAll(lowerData, "_", "-")
 	return lowerData
+}
+
+func generateRandomName() (string, error) {
+	const nameLength = 20
+	var authCodeNameBytes [nameLength]byte
+	_, err := io.ReadFull(rand.Reader, authCodeNameBytes[:])
+	if err != nil {
+		return "", err
+	}
+	authCodeName := hex.EncodeToString(authCodeNameBytes[:])
+	return authCodeName, nil
 }
