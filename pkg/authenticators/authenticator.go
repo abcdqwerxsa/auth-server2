@@ -121,7 +121,7 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 	// fetch user
 	userCR, err := fuyaouser.GetUserInfo(a.k8sClient, username)
 	if err != nil {
-		zlog.LogErrorf("cannot get the password for %s, err: %v", username, err)
+		zlog.LogErrorf("cannot get the password secret for %s", username)
 		return nil, nil, fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
@@ -141,7 +141,7 @@ func (a *FuyaoPasswordAuthenticator) savePassword(username string, passwd []byte
 	// fetch user
 	userCR, err := fuyaouser.GetUserInfo(a.k8sClient, username)
 	if err != nil {
-		zlog.LogErrorf("cannot get the password secret for %s, err: %v", username, err)
+		zlog.LogErrorf("cannot get the password secret for %s", username)
 		return fuyaoerrors.ErrPasswordAuthenticationFailed
 	}
 
