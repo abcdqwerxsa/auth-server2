@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: oauth-server
-  namespace: fuyao-oauth
+  namespace: openfuyao-system
   labels:
     application: "oauth-server"
 spec:

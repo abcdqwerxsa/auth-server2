@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	secretNamespace = "fuyao-oauth"
+	secretNamespace = "openfuyao-system"
 	secretName      = "oauth-jwt-cookie-secret"
 )
 

@@ -42,7 +42,7 @@ type PasswordAuthenticator interface {
 	ConfirmPassword(ctx context.Context, username string, newPassword []byte) error
 }
 
-// FuyaoPasswordAuthenticator is the default password authenticator for fuyao-oauth-server
+// FuyaoPasswordAuthenticator is the default password authenticator for openfuyao oauth-server
 type FuyaoPasswordAuthenticator struct {
 	k8sClient dynamic.Interface
 	encryptor Encryptor

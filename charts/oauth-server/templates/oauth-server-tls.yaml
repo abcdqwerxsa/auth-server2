@@ -11,5 +11,5 @@ kind: Secret
 type: Opaque
 metadata:
   name: oauth-server-tls
-  namespace: fuyao-oauth
+  namespace: openfuyao-system
 {{- end }}
