@@ -14,13 +14,14 @@
 package generators
 
 import (
-	"bytes"
-	"encoding/base64"
-	"strings"
+	"crypto/rand"
+	"encoding/hex"
+	"io"
 
-	"github.com/google/uuid"
 	"gopkg.in/oauth2.v3"
 	"gopkg.in/oauth2.v3/generates"
+
+	"openfuyao/oauth-server/pkg/constants"
 )
 
 // NewFuyaoAuthorizeGenerate create to generate the authorize code instance
@@ -35,11 +36,11 @@ type FuyaoAuthorizeGenerate struct {
 
 // Token generate token according to the UUID token, returns lowercase letters
 func (ag *FuyaoAuthorizeGenerate) Token(basicInfo *oauth2.GenerateBasic) (string, error) {
-	bufferString := bytes.NewBufferString(basicInfo.Client.GetID())
-	bufferString.WriteString(basicInfo.UserID)
-	uuidToken := uuid.NewMD5(uuid.Must(uuid.NewRandom()), bufferString.Bytes())
-	authCode := base64.URLEncoding.EncodeToString([]byte(uuidToken.String()))
-	authCode = strings.ToLower(strings.TrimRight(authCode, "="))
-
+	var authCodeBytes [constants.AuthCodeByteLength]byte
+	_, err := io.ReadFull(rand.Reader, authCodeBytes[:])
+	if err != nil {
+		return "", err
+	}
+	authCode := hex.EncodeToString(authCodeBytes[:])
 	return authCode, nil
 }

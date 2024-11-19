@@ -13,21 +13,21 @@
 package authenticators
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"reflect"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
 // TestPBKDF2EncryptorEncryptPassword test EncryptPassword interface
 func TestPBKDF2EncryptorEncryptPassword(t *testing.T) {
 	type args struct {
-		rawPassword string
+		rawPassword []byte
 	}
 
 	encryptor := &PBKDF2Encryptor{
@@ -45,7 +45,7 @@ func TestPBKDF2EncryptorEncryptPassword(t *testing.T) {
 	}{
 		{
 			"encrypt succeed but since the salt is generated totally randomly, want cannot equal to got",
-			args{rawPassword: "Soup4@LL"},
+			args{rawPassword: []byte("Soup4@LL")},
 			"1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE=",
 			false,
 		},
@@ -57,7 +57,7 @@ func TestPBKDF2EncryptorEncryptPassword(t *testing.T) {
 				t.Errorf("EncryptPassword() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != "" {
+			if len(got) != 0 {
 				t.Errorf("EncryptPassword() got = %v, want %v", got, tt.want)
 			}
 		})
@@ -67,8 +67,8 @@ func TestPBKDF2EncryptorEncryptPassword(t *testing.T) {
 // TestPBKDF2EncryptorVerifyPassword test Verify Password interface
 func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 	type args struct {
-		rawPassword       string
-		encryptedPassword string
+		rawPassword       []byte
+		encryptedPassword []byte
 	}
 
 	encryptor := &PBKDF2Encryptor{
@@ -87,8 +87,8 @@ func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 		{
 			"verify password succeed",
 			args{
-				rawPassword:       "Soup4@LL",
-				encryptedPassword: "1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE=",
+				rawPassword:       []byte("Soup4@LL"),
+				encryptedPassword: []byte("1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE="),
 			},
 			true,
 			false,
@@ -96,8 +96,8 @@ func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 		{
 			"verify password fail: raw password does not match",
 			args{
-				rawPassword:       "soup4@LL",
-				encryptedPassword: "1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE=",
+				rawPassword:       []byte("soup4@LL"),
+				encryptedPassword: []byte("1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE="),
 			},
 			false,
 			false,
@@ -105,8 +105,8 @@ func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 		{
 			"verify password fail: cannot decode base64 encrypted password",
 			args{
-				rawPassword:       "soup4@LL",
-				encryptedPassword: "r1R43niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE#",
+				rawPassword:       []byte("soup4@LL"),
+				encryptedPassword: []byte("r1R43niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE#"),
 			},
 			false,
 			true,
@@ -152,10 +152,12 @@ func TestNewPBKDF2Encryptor(t *testing.T) {
 
 func TestNewFuyaoPasswordAuthenticator(t *testing.T) {
 	type args struct {
-		k8sClient kubernetes.Interface
+		k8sClient dynamic.Interface
 		namespace string
 	}
-	fakeClient := fake.NewSimpleClientset()
+	scheme := runtime.NewScheme()
+	var resource runtime.Object
+	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme, resource)
 	tests := []struct {
 		name string
 		args args
@@ -184,16 +186,18 @@ func TestNewFuyaoPasswordAuthenticator(t *testing.T) {
 
 func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 	type fields struct {
-		k8sClient kubernetes.Interface
+		k8sClient dynamic.Interface
 		ns        string
 		encryptor Encryptor
 	}
 	type args struct {
 		username string
-		passwd   string
+		passwd   []byte
 	}
 
-	fakeClient := fake.NewSimpleClientset()
+	scheme := runtime.NewScheme()
+	var resource runtime.Object
+	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme, resource)
 	encryptor := &PBKDF2Encryptor{
 		saltLength:    16,
 		iterations:    100000,
@@ -216,7 +220,7 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 			},
 			args{
 				username: "admin",
-				passwd:   "test@123",
+				passwd:   []byte("test@123"),
 			},
 			true,
 		},
@@ -229,7 +233,7 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 			},
 			args{
 				username: "admin",
-				passwd:   "test@12",
+				passwd:   []byte("test@12"),
 			},
 			false,
 		},
@@ -242,7 +246,7 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 			},
 			args{
 				username: "admin",
-				passwd:   "test1234",
+				passwd:   []byte("test1234"),
 			},
 			false,
 		},
@@ -255,7 +259,7 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 			},
 			args{
 				username: "admin",
-				passwd:   "admin",
+				passwd:   []byte("admin"),
 			},
 			false,
 		},
@@ -299,7 +303,7 @@ func Test_reverseString(t *testing.T) {
 
 func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T) {
 	type fields struct {
-		k8sClient kubernetes.Interface
+		k8sClient dynamic.Interface
 		ns        string
 		encryptor Encryptor
 	}
@@ -307,19 +311,9 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 		username string
 	}
 
-	testUserSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin",
-			Namespace: "oauth-user",
-		},
-		Data: map[string][]byte{
-			"username":           []byte("admin"),
-			"groups":             []byte("system:admin"),
-			"extra":              []byte(`{"first-login":["true"]}`),
-			"encrypted-password": []byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
-		},
-	}
-	fakeClient := fake.NewSimpleClientset(testUserSecret)
+	scheme := runtime.NewScheme()
+	var resource runtime.Object
+	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme, resource)
 	encryptor := &PBKDF2Encryptor{
 		saltLength:    16,
 		iterations:    100000,
@@ -339,7 +333,7 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 		fields  fields
 		args    args
 		want    user.Info
-		want1   string
+		want1   []byte
 		wantErr bool
 	}{
 		{
@@ -351,19 +345,19 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 			},
 			args{username: "admin"},
 			userinfo,
-			"lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ=",
+			[]byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
 			false,
 		},
 		{
 			"no secret",
 			fields{
-				k8sClient: fake.NewSimpleClientset(),
+				k8sClient: fakeClient,
 				ns:        "oauth-user",
 				encryptor: encryptor,
 			},
 			args{username: "admin"},
 			nil,
-			"",
+			[]byte(""),
 			true,
 		},
 	}
@@ -381,7 +375,7 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("fetchUserInfoAndStoredPassword() got = %v, want %v", got, tt.want)
 			}
-			if got1 != tt.want1 {
+			if !bytes.Equal(got1, tt.want1) {
 				t.Errorf("fetchUserInfoAndStoredPassword() got1 = %v, want %v", got1, tt.want1)
 			}
 		})

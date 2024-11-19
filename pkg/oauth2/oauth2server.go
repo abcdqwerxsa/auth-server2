@@ -41,6 +41,7 @@ import (
 	"openfuyao/oauth-server/pkg/generators"
 	"openfuyao/oauth-server/pkg/httpserver"
 	"openfuyao/oauth-server/pkg/sessions"
+	"openfuyao/oauth-server/pkg/utils"
 	"openfuyao/oauth-server/pkg/zlog"
 )
 
@@ -311,7 +312,7 @@ func (s *FuyaoAuthorizeServer) ValidateAuthorizeRequest(r *http.Request) (*Fuyao
 	}
 
 	// fetch the path parameter identityProvider
-	idp := r.FormValue("identity_provider")
+	idp := utils.EscapeSpecialChars(r.FormValue("identity_provider"))
 	if idp == "" {
 		return nil, fuyaoerrors.ErrIdentityProviderIncorrect
 	}
@@ -332,11 +333,14 @@ func (s *FuyaoAuthorizeServer) ValidateAuthorizeRequest(r *http.Request) (*Fuyao
 
 func isValidRedirectURI(s string) bool {
 	regexPattern := `^(?:(?:https?://(?:[\w.-]+|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d{1,5})?)|[\w.-]` +
-		`+(?:\.\w{2,})?)?(/rest/auth/callback|/[a-z]+/oauth/callback)$`
+		`+(?:\.\w{2,})?)?(/rest/auth/callback|/[^/]+/oauth/callback)$`
 	match, err := regexp.MatchString(regexPattern, s)
 	if err != nil {
 		zlog.LogErrorf("Error compiling regex:", err)
 		return false
+	}
+	if !match {
+		zlog.LogErrorf("redirect_uri parameter does not match")
 	}
 	return match
 }
@@ -539,7 +543,7 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	w.WriteHeader(status)
 	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
-		zlog.LogErrorf("%s, err: %s", fuyaoerrors.ErrStrFailToMarshalData, err)
+		zlog.LogErrorf("%s, err: %v", fuyaoerrors.ErrStrFailToMarshalData, err)
 	}
 
 	return

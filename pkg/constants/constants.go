@@ -99,3 +99,8 @@ const (
 const (
 	Decimal = 10
 )
+
+// Constants for authcode generation
+const (
+	AuthCodeByteLength = 16
+)

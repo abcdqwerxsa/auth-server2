@@ -93,7 +93,7 @@ func (o *OAuthServerOption) ReadConfig() (*config.OAuthServerAPIServerConfig, er
 func readDataFromK8sSecret(k8sClient kubernetes.Interface, key string) ([]byte, error) {
 	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, v1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, fuyaoerrors.ErrFailToGetSecret
 	}
 
 	b64Data := secret.Data[key]
