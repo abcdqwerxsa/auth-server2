@@ -6,3 +6,4 @@ description: >
 type: application
 version: 0.0.0-multicluster
 appVersion: "latest"
+keywords: ["openfuyao-component"]
