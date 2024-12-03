@@ -257,7 +257,7 @@ func getConsoleServiceHost(r *http.Request) string {
 	if r.TLS != nil {
 		scheme = "https"
 	}
-	redirect := fmt.Sprintf("%s://%s", scheme, r.Host)
+	redirect := fmt.Sprintf("%s://%s", scheme, r.URL.Host)
 	return redirect
 }
 
