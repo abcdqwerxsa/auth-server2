@@ -253,12 +253,7 @@ func (l *Login) revertPasswordConfirm(w http.ResponseWriter, r *http.Request) {
 }
 
 func getConsoleServiceHost(r *http.Request) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	redirect := fmt.Sprintf("%s://%s", scheme, r.URL.Host)
-	return redirect
+	return "/"
 }
 
 // PasswordResetHandler resets the password
