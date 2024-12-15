@@ -15,7 +15,11 @@ package fuyaostore
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"io"
 	"strings"
 	"time"
 
@@ -48,15 +52,21 @@ func NewK8sSecretStore(k8sClient kubernetes.Interface, ns string) *K8sSecretStor
 
 // Create creates a new code/access-token/refresh-token
 func (s *K8sSecretStore) Create(info oauth2.TokenInfo) error {
+	zlog.LogInfof("create token-info: %v", info)
 	if code := info.GetCode(); code != "" {
 		return s.createByCode(info)
 	}
+
 	if access := info.GetAccess(); access != "" {
-		return s.createByAccess(info)
+		if err := s.createByAccess(info); err != nil {
+			return err
+		}
+		if refresh := info.GetRefresh(); refresh != "" {
+			return s.createByRefresh(info)
+		}
+		return nil
 	}
-	if refresh := info.GetRefresh(); refresh != "" {
-		return s.createByRefresh(info)
-	}
+
 	return fuyaoerrors.ErrTokenTypeUnrecognized
 }
 
@@ -74,10 +84,16 @@ func (s *K8sSecretStore) createByCode(info oauth2.TokenInfo) error {
 		return err
 	}
 
+	// generate authorization_code name
+	authNameID, err := generateRandomName()
+	if err != nil {
+		return errors.New("generate auth-code name failed")
+	}
+
 	// save the info to secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.CodePrefix + info.GetCode(),
+			Name:      constants.CodePrefix + authNameID,
 			Namespace: s.ns,
 		},
 		Data: map[string][]byte{
@@ -96,7 +112,7 @@ func (s *K8sSecretStore) createByCode(info oauth2.TokenInfo) error {
 }
 
 func (s *K8sSecretStore) createByAccess(info oauth2.TokenInfo) error {
-	// prepare ttl
+	// only prepare ttl, we don't actually save access-token
 	currentTime := time.Now()
 	info.SetAccessCreateAt(currentTime)
 	if exp := info.GetAccessExpiresIn(); exp == 0 {
@@ -107,13 +123,71 @@ func (s *K8sSecretStore) createByAccess(info oauth2.TokenInfo) error {
 }
 
 func (s *K8sSecretStore) createByRefresh(info oauth2.TokenInfo) error {
-	return fuyaoerrors.ErrNotImplemented
+	// prepare ttl
+	currentTime := time.Now()
+	info.SetRefreshCreateAt(currentTime)
+	if exp := info.GetRefreshExpiresIn(); exp == 0 {
+		zlog.LogWarn("the refresh token expiration time is not set")
+	}
+
+	// serialize the info
+	data, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+
+	// generate refresh-token name
+	refreshTokenID, err := generateRandomName()
+	if err != nil {
+		return errors.New("generate refresh-token name failed")
+	}
+
+	// save the info to secret
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      constants.RefreshPrefix + refreshTokenID,
+			Namespace: s.ns,
+		},
+		Data: map[string][]byte{
+			"userinfo": data,
+		},
+	}
+
+	// create the secret
+	_, err = s.k8sClient.CoreV1().Secrets(s.ns).Create(context.Background(), secret, metav1.CreateOptions{})
+	if err != nil {
+		zlog.LogErrorf("cannot create refresh-token secret")
+		return fuyaoerrors.ErrFailToCreateSecret
+	}
+
+	return nil
 }
 
 // RemoveByCode removes the auth-code
 func (s *K8sSecretStore) RemoveByCode(code string) error {
-	name := constants.CodePrefix + code
-	err := s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), name, metav1.DeleteOptions{})
+	codeList, err := s.k8sClient.CoreV1().Secrets(s.ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var target *corev1.Secret
+	for _, codeItem := range codeList.Items {
+		info, err := s.decodeUserInfo(codeItem.Data["userinfo"])
+		if err != nil {
+			continue
+		}
+		if info.GetCode() == code {
+			target = &codeItem
+			break
+		}
+	}
+
+	if target == nil {
+		zlog.LogErrorf("cannot delete auth-code secret")
+		return fuyaoerrors.ErrFailToDeleteSecret
+	}
+
+	err = s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), target.Name, metav1.DeleteOptions{})
 	if err != nil {
 		zlog.LogErrorf("cannot delete auth-code secret")
 		return fuyaoerrors.ErrFailToDeleteSecret
@@ -136,21 +210,59 @@ func (s *K8sSecretStore) RemoveByAccess(access string) error {
 
 // RemoveByRefresh removes the refresh-token
 func (s *K8sSecretStore) RemoveByRefresh(refresh string) error {
-	return fuyaoerrors.ErrNotImplemented
+	refreshList, err := s.k8sClient.CoreV1().Secrets(s.ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var target *corev1.Secret
+	for _, refreshItem := range refreshList.Items {
+		info, err := s.decodeUserInfo(refreshItem.Data["userinfo"])
+		if err != nil {
+			continue
+		}
+		if info.GetRefresh() == refresh {
+			target = &refreshItem
+			break
+		}
+	}
+
+	if target == nil {
+		zlog.LogErrorf("cannot delete refresh-token secret")
+		return fuyaoerrors.ErrFailToDeleteSecret
+	}
+
+	err = s.k8sClient.CoreV1().Secrets(s.ns).Delete(context.Background(), target.Name, metav1.DeleteOptions{})
+	if err != nil {
+		zlog.LogErrorf("cannot delete refresh-token secret")
+		return fuyaoerrors.ErrFailToDeleteSecret
+	}
+
+	return nil
 }
 
 // GetByCode gets the auth-code data
 func (s *K8sSecretStore) GetByCode(code string) (oauth2.TokenInfo, error) {
-	// get the secret
-	name := constants.CodePrefix + code
-	userdata, err := s.k8sClient.CoreV1().Secrets(s.ns).Get(context.Background(), name, metav1.GetOptions{})
+	codeList, err := s.k8sClient.CoreV1().Secrets(s.ns).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		zlog.LogErrorf("cannot get auth-code secret")
-		return nil, fuyaoerrors.ErrFailToGetSecret
+		return nil, err
 	}
 
-	// unmarshal to data
-	return s.decodeUserInfo(userdata.Data["userinfo"])
+	for _, codeItem := range codeList.Items {
+		if !strings.HasPrefix(codeItem.Name, constants.CodePrefix) {
+			continue
+		}
+		info, err := s.decodeUserInfo(codeItem.Data["userinfo"])
+		if err != nil {
+			continue
+		}
+		if info.GetCode() == code {
+			return info, nil
+		}
+	}
+
+	zlog.LogErrorf("cannot get auth-code secret")
+	return nil, fuyaoerrors.ErrFailToGetSecret
 }
 
 // GetByAccess gets the access-token data
@@ -169,7 +281,26 @@ func (s *K8sSecretStore) GetByAccess(access string) (oauth2.TokenInfo, error) {
 
 // GetByRefresh gets the refresh-token data
 func (s *K8sSecretStore) GetByRefresh(refresh string) (oauth2.TokenInfo, error) {
-	return nil, fuyaoerrors.ErrNotImplemented
+	codeList, err := s.k8sClient.CoreV1().Secrets(s.ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, codeItem := range codeList.Items {
+		if !strings.HasPrefix(codeItem.Name, constants.RefreshPrefix) {
+			continue
+		}
+		info, err := s.decodeUserInfo(codeItem.Data["userinfo"])
+		if err != nil {
+			continue
+		}
+		if info.GetRefresh() == refresh {
+			return info, nil
+		}
+	}
+
+	zlog.LogErrorf("cannot get refresh-token secret")
+	return nil, fuyaoerrors.ErrFailToGetSecret
 }
 
 func (s *K8sSecretStore) decodeUserInfo(data []byte) (oauth2.TokenInfo, error) {
@@ -188,4 +319,15 @@ func refactorSecretName(data string) string {
 	lowerData = strings.ReplaceAll(lowerData, ".", "")
 	lowerData = strings.ReplaceAll(lowerData, "_", "-")
 	return lowerData
+}
+
+func generateRandomName() (string, error) {
+	const nameLength = 20
+	var authCodeNameBytes [nameLength]byte
+	_, err := io.ReadFull(rand.Reader, authCodeNameBytes[:])
+	if err != nil {
+		return "", err
+	}
+	authCodeName := hex.EncodeToString(authCodeNameBytes[:])
+	return authCodeName, nil
 }

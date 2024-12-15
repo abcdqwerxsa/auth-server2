@@ -87,11 +87,21 @@ func NewOAuthServer(
 	tokenStore *fuyaostore.K8sSecretStore,
 	cfg *config.OAuthServerConfig,
 ) *FuyaoAuthorizeServer {
-	// init manager and configs
+	// init inner-oauth2-server, manager and configs
+	innerOAuthServerConfig := server.NewConfig()
+	innerOAuthServerConfig.AllowedResponseTypes = []oauth2.ResponseType{oauth2.Code}
+	innerOAuthServerConfig.AllowedGrantTypes = []oauth2.GrantType{oauth2.AuthorizationCode, oauth2.Refreshing}
+
 	manager := manage.NewDefaultManager()
+	zlog.LogInfof("oauth-server-config: %v", cfg)
 	manager.SetAuthorizeCodeTokenCfg(
 		&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp,
 			IsGenerateRefresh: cfg.IsGenerateRefresh})
+	manager.SetRefreshTokenCfg(
+		&manage.RefreshingConfig{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp,
+			IsGenerateRefresh: cfg.IsGenerateRefresh, IsResetRefreshTime: true, IsRemoveAccess: false,
+			IsRemoveRefreshing: true,
+		})
 	manager.SetAuthorizeCodeExp(cfg.AuthCodeExp)
 
 	// auth code and jwt access token generator
@@ -110,7 +120,7 @@ func NewOAuthServer(
 	manager.MapClientStorage(clientStore)
 	manager.MapTokenStorage(tokenStore)
 
-	srv := NewFuyaoAuthorizeServer(server.NewConfig(), manager, idpLoginStore, tokenStore)
+	srv := NewFuyaoAuthorizeServer(innerOAuthServerConfig, manager, idpLoginStore, tokenStore)
 	srv.SetInternalErrorHandler(func(err error) (re *errors.Response) {
 		log.Println("Internal Error:", err.Error())
 		return
@@ -127,6 +137,7 @@ func NewOAuthServer(
 	srv.SetExtensionFieldsHandler(func(ti oauth2.TokenInfo) map[string]interface{} {
 		fieldsValue := make(map[string]interface{})
 		fieldsValue[constants.TokenUserID] = ti.GetUserID()
+		fieldsValue[constants.RefreshTokenExpiry] = int64(ti.GetRefreshExpiresIn() / time.Second)
 		return fieldsValue
 	})
 
@@ -235,6 +246,7 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// 通过ExtensionFieldsHandler来将refresh-token的过期时间传回
 	s.returnAccessToken(w, s.GetTokenData(ti), nil)
 
 	return
@@ -429,7 +441,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
 		}
 		// we only log the error, the logout needs to proceed
-		httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	oauthServerSessionID := sessionArray[0]
@@ -472,7 +484,7 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 	zlog.LogInfof("Logout succeed for user")
 
 	// no content to return
-	httpserver.RespondWithStatusMsg(w, http.StatusNoContent, 0, "")
+	w.WriteHeader(http.StatusNoContent)
 	return
 }
 
