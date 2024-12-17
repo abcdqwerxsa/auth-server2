@@ -85,7 +85,7 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 
 	// csrf
 	CSRF := csrf.Protect(s.Cfg.IDPLoginStoreConfig.EncryptionKey, csrf.SameSite(csrf.SameSiteStrictMode),
-		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(s.Cfg.IDPLoginStoreConfig.SessionMaxAge),
+		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(0),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var requestBody fuyaopassword.LoginRequest
 			if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
