@@ -37,7 +37,7 @@ config:
 
 image:
   repository: "harbor.openfuyao.com/openfuyao/oauth-server"
-  tag: "latest"
+  tag: "v24.12"
   pullPolicy: "Always"
   digest: "sha256:6b3169dc118fb4c479a6fc4e81653b2c431e906633d786955c739dce69992668"
   busyBox: ""

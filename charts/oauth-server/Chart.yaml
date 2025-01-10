@@ -4,6 +4,6 @@ description: >
   A Helm chart for openFuyao OAuth2.0 server. It interacts with console-service to provide access token for each
   user. Users are required to input passwords for authentication.
 type: application
-version: 0.0.0-latest
-appVersion: "latest"
+version: 0.12.0
+appVersion: "v24.12"
 keywords: ["openfuyao-component"]
