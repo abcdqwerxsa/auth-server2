@@ -22,7 +22,7 @@ spec:
         fsGroup: 65532
       initContainers:
         - name: init-permission
-          image: {{ .Values.image.busyBox }}
+          image: '{{ list . "busyBox" | include "helpers.image.name" }}'
           command: ["sh", "-c", "chmod -R 700 /var/log/oauth-server && chown -R 65532:65532 /var/log/oauth-server"]
           volumeMounts:
             - name: log-path
@@ -32,8 +32,8 @@ spec:
             runAsGroup: 0
       containers:
         - name: oauth-server
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: '{{ list . "core" | include "helpers.image.name" }}'
+          imagePullPolicy: {{ .Values.images.core.pullPolicy }}
           ports:
             - name: https
               containerPort: {{ .Values.config.httpServerConfig.port }}
