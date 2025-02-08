@@ -1,4 +1,4 @@
-# syntax=harbor.openfuyao.com/infra/dockerfile:1.9.0
+# syntax=docker/dockerfile:latest
 
 # Copyright (c) 2024 Huawei Technologies Co., Ltd.
 # openFuyao is licensed under Mulan PSL v2.
@@ -10,15 +10,21 @@
 # MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 # See the Mulan PSL v2 for more details.
 
-ARG GO_VERSION=1.21.8
-ARG GO_IMAGE=harbor.openfuyao.com/openfuyao/golang:${GO_VERSION}-onbuild
+# currently supported builders:
+# - golang
+ARG BUILDER=golang
+ARG BUILDER_VERSION=1.21.8
+ARG BUILDER_IMAGE=harbor.openfuyao.com/openfuyao/builder/$BUILDER:$BUILDER_VERSION
 ARG PKG=./cmd/oauth-server
 
-# stage 1: build
-FROM ${GO_IMAGE} AS build
+ARG BASE_TYPE=static
+ARG BASE_IMAGE=harbor.openfuyao.com/openfuyao/base/$BASE_TYPE
 
-# stage 2: final
-FROM harbor.openfuyao.com/openfuyao/base-layout AS final
+# stage 1: build
+FROM $BUILDER_IMAGE AS build
+
+# stage 2: release
+FROM $BASE_IMAGE AS release
 
 WORKDIR /
 

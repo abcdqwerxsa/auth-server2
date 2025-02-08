@@ -38,8 +38,8 @@ data:
         "CodeTokenNamespace": "oauth-code-token",
         "AuthCodeExp": {{ .Values.config.oauthServerConfig.authCodeExp | quote }},
         "AccessTokenExp": {{ .Values.config.oauthServerConfig.accessTokenExp | quote }},
-        "RefreshTokenExp": "2h",
-        "IsGenerateRefresh": false,
+        "RefreshTokenExp": {{ .Values.config.oauthServerConfig.refreshTokenExp | quote }},
+        "IsGenerateRefresh": {{- if .Values.config.oauthServerConfig.refreshTokenExp }}true{{- else }}false{{- end }},
         "JWTKeyID": "access_token_sign_key",
         "ClientMapper": {
           "console": {{ .Values.config.oauthServerConfig.clientSecret.console | quote }},

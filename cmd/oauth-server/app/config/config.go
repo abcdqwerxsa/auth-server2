@@ -261,12 +261,6 @@ func (o *OAuthServerConfig) Validate() []error {
 		zlog.LogWarn("the access token will not expire")
 	}
 
-	if o.IsGenerateRefresh || o.RefreshTokenExp > 0 {
-		zlog.LogWarn("the refresh token is not supported in this version, disable by default")
-		o.IsGenerateRefresh = false
-		o.RefreshTokenExp = 0
-	}
-
 	if o.JWTKeyID == "" {
 		zlog.LogWarn("the key id for JWT header is not provided")
 	}

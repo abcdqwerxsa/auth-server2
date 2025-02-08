@@ -56,7 +56,8 @@ const (
 
 // Constants for access token extension fields
 const (
-	TokenUserID = "user_id"
+	TokenUserID        = "user_id"
+	RefreshTokenExpiry = "refresh_token_expires_in"
 )
 
 // Constants for url redirect templates
