@@ -93,7 +93,6 @@ func NewOAuthServer(
 	innerOAuthServerConfig.AllowedGrantTypes = []oauth2.GrantType{oauth2.AuthorizationCode, oauth2.Refreshing}
 
 	manager := manage.NewDefaultManager()
-	zlog.LogInfof("oauth-server-config: %v", cfg)
 	manager.SetAuthorizeCodeTokenCfg(
 		&manage.Config{AccessTokenExp: cfg.AccessTokenExp, RefreshTokenExp: cfg.RefreshTokenExp,
 			IsGenerateRefresh: cfg.IsGenerateRefresh})

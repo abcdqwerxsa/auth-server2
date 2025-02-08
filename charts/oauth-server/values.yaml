@@ -16,7 +16,7 @@ config:
       -----END CERTIFICATE-----
 
   loginSessionConfig:
-    maxSeconds: 300
+    maxSeconds: 7200
     # signingKey和encryptionKey会在openFuyao安装的时候由installer生成并覆盖
     signingKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     encryptionKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
@@ -44,6 +44,9 @@ images:
   busyBox:
     repository: "harbor.openfuyao.com/busybox/busybox"
     tag: "1.36.1"
+  kubectl:
+    repository: "harbor.openfuyao.com/openfuyao/kubectl-openfuyao"
+    tag: "latest"
 
 resources:
   requests:
