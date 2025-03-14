@@ -24,7 +24,7 @@ const (
 	<meta http-equiv="Expires" content="0">
 	<meta http-equiv="Pragma" content="no-cache">
 	<meta http-equiv="Cache-control" content="no-cache,no-store,must-revalidate">
-    <title>cskTurbo管理平台</title>
+    <title>CSK Turbo管理平台</title>
 	<style>
         body,html{margin:0;padding:0;font-size:14px;font-family:'Montserrat',sans-serif;box-sizing:border-box}
         input,button,.password-input-icon{outline:0;transition:all .2s cubic-bezier(0.645,0.045,0.355,1)}
@@ -92,7 +92,7 @@ const (
 <body>
     <div id="root">
         <div class="form-block">
-            <h3>欢迎登录cskTurbo</h3>
+            <h3>欢迎登录CSK Turbo</h3>
             <form id="login-form" autocomplete="off">
               <div class="error-placeholder">
                 {{ if .Error }}
@@ -228,7 +228,7 @@ const (
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cskTurbo管理平台</title>
+    <title>CSK Turbo管理平台</title>
 	<meta http-equiv="Expires" content="0">
 	<meta http-equiv="Pragma" content="no-cache">
 	<meta http-equiv="Cache-control" content="no-cache,no-store,must-revalidate">
