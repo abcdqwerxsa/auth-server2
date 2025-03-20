@@ -36,7 +36,6 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: ["oauth-server-tls", "oauth-jwt-cookie-secret", "oauth-client-secrets"]
     verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
