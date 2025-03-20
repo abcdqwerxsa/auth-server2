@@ -40,6 +40,10 @@ data:
         "AccessTokenExp": {{ .Values.config.oauthServerConfig.accessTokenExp | quote }},
         "RefreshTokenExp": {{ .Values.config.oauthServerConfig.refreshTokenExp | quote }},
         "IsGenerateRefresh": {{- if .Values.config.oauthServerConfig.refreshTokenExp }}true{{- else }}false{{- end }},
-        "JWTKeyID": "access_token_sign_key"
+        "JWTKeyID": "access_token_sign_key",
+        "ClientMapper": {
+          "console": {{ .Values.config.oauthServerConfig.clientSecret.console | quote }},
+          "oauth-proxy": {{ .Values.config.oauthServerConfig.clientSecret.oauthProxy | quote }}
+        }
       }
     }

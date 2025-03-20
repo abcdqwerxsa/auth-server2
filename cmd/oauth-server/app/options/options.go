@@ -15,7 +15,7 @@ package options
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/base64"
 
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +29,7 @@ import (
 
 const (
 	secretNamespace = "openfuyao-system"
-	jwtSecretName   = "oauth-jwt-cookie-secret"
-	oauthSecretName = "oauth-client-secrets"
+	secretName      = "oauth-jwt-cookie-secret"
 )
 
 // OAuthServerOption stores the overall configfile and its loading method for the whole oauthserver service
@@ -69,50 +68,43 @@ func (o *OAuthServerOption) ReadConfig() (*config.OAuthServerAPIServerConfig, er
 	k8sClient := k8sconfig.GetKubernetesClient(oAuthServerConfig.K8sConfig)
 
 	// manually add secret keys
-	jwtPrivateKeyDecoded, err := readDataFromK8sSecret(k8sClient, jwtSecretName, "oauth-jwt.key")
+	jwtPrivateKeyDecoded, err := readDataFromK8sSecret(k8sClient, "oauth-jwt.key")
 	if err != nil {
 		return nil, err
 	}
 	oAuthServerConfig.OAuthServerConfig.JWTPrivateKey = jwtPrivateKeyDecoded
 
-	signKeyDecoded, err := readDataFromK8sSecret(k8sClient, jwtSecretName, "oauth-cookie-sign.key")
+	signKeyDecoded, err := readDataFromK8sSecret(k8sClient, "oauth-cookie-sign.key")
 	if err != nil {
 		return nil, err
 	}
 	oAuthServerConfig.IDPLoginStoreConfig.SigningKey = signKeyDecoded
 
-	encryptKeyDecoded, err := readDataFromK8sSecret(k8sClient, jwtSecretName, "oauth-cookie-encrypt.key")
+	encryptKeyDecoded, err := readDataFromK8sSecret(k8sClient, "oauth-cookie-encrypt.key")
 	if err != nil {
 		return nil, err
 	}
 	oAuthServerConfig.IDPLoginStoreConfig.EncryptionKey = encryptKeyDecoded
 
-	oAuthIDSecretsDecoded, err := readDataFromK8sSecret(k8sClient, oauthSecretName, "client-mapper")
-	if err != nil {
-		return nil, err
-	}
-	var clientMapper map[string]string
-	err = json.Unmarshal(oAuthIDSecretsDecoded, &clientMapper)
-	if err != nil {
-		zlog.LogErrorf("cannot load data from client-id-secrets-mapper, err: %v", err)
-		return nil, err
-	}
-
-	oAuthServerConfig.OAuthServerConfig.ClientMapper = clientMapper
 	return &oAuthServerConfig, nil
 
 }
 
-func readDataFromK8sSecret(k8sClient kubernetes.Interface, name, key string) ([]byte, error) {
-	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), name, v1.GetOptions{})
+func readDataFromK8sSecret(k8sClient kubernetes.Interface, key string) ([]byte, error) {
+	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, v1.GetOptions{})
 	if err != nil {
 		return nil, fuyaoerrors.ErrFailToGetSecret
 	}
 
-	rawData := secret.Data[key]
-	if rawData == nil {
-		zlog.LogErrorf("cannot load data from %s", name)
+	b64Data := secret.Data[key]
+	if b64Data == nil {
+		zlog.LogErrorf("cannot load data from jwt-cookie")
 		return nil, fuyaoerrors.ErrFailToGetSecret
+	}
+
+	rawData, err := base64.StdEncoding.DecodeString(string(b64Data))
+	if err != nil {
+		return nil, err
 	}
 
 	return rawData, nil
