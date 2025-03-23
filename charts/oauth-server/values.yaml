@@ -17,7 +17,7 @@ config:
 
   loginSessionConfig:
     maxSeconds: 7200
-    # signingKey和encryptionKey会在openFuyao安装的时候由installer生成并覆盖，输入项应已经base64编码
+    # signingKey和encryptionKey会在openFuyao安装的时候由installer生成并覆盖
     signingKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     encryptionKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
@@ -30,7 +30,7 @@ config:
     authCodeExp: "5m"
     accessTokenExp: "5m"
     refreshTokenExp: "2h"
-    # JWTPrivateKey和clientIDSecret会在在openFuyao安装的时候由installer生成并覆盖，输入项应已经base64编码
+    # JWTPrivateKey会在在openFuyao安装的时候由installer生成并覆盖
     JWTPrivateKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     # clientIDSecret中的每一项的key为ID，格式为string，val为secret，由 openssl rand -base64 32 生成
     clientIDSecret: | 
