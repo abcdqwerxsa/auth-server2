@@ -32,9 +32,12 @@ config:
     refreshTokenExp: "2h"
     # JWTPrivateKey会在在openFuyao安装的时候由installer生成并覆盖
     JWTPrivateKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    clientSecret:
-      console: "console-password"
-      oauthProxy: "SECRETTS"
+    # clientIDSecret中的每一项的key为ID，格式为string，val为secret，由 openssl rand -base64 32 生成
+    clientIDSecret: | 
+      {
+        "console": "loI8mEPaPriZw7TdDnZDT5YRY5BB2kaTVkJn+dI0qKw=",
+        "oauthProxy": "SECRETSS"
+      }
 
 images:
   core:
