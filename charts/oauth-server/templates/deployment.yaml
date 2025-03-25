@@ -22,7 +22,7 @@ spec:
         fsGroup: 65532
       initContainers:
         - name: init-permission
-          image: '{{ list . "busyBox" | include "helpers.image.name" }}'
+          image: {{ .Values.thirdPartyImages.busyBox.repository }}:{{ .Values.thirdPartyImages.busyBox.tag }}
           command: ["sh", "-c", "chmod -R 700 /var/log/oauth-server && chown -R 65532:65532 /var/log/oauth-server"]
           volumeMounts:
             - name: log-path
