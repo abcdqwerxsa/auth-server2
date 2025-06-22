@@ -14,18 +14,15 @@ config:
       -----BEGIN CERTIFICATE-----
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
       -----END CERTIFICATE-----
-
   loginSessionConfig:
     maxSeconds: 7200
     # signingKey和encryptionKey会在openFuyao安装的时候由installer生成并覆盖
     signingKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     encryptionKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
   ipProtectorConfig:
     failTimes: "5"
     failDuration: "5m"
     lockDuration: "20m"
-
   oauthServerConfig:
     authCodeExp: "5m"
     accessTokenExp: "5m"
@@ -33,26 +30,23 @@ config:
     # JWTPrivateKey会在在openFuyao安装的时候由installer生成并覆盖
     JWTPrivateKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     # clientIDSecret中的每一项的key为ID，格式为string，val为secret，由 openssl rand -base64 32 生成
-    clientIDSecret: | 
+    clientIDSecret: |
       {
         "console": "loI8mEPaPriZw7TdDnZDT5YRY5BB2kaTVkJn+dI0qKw=",
         "oauthProxy": "SECRETSS"
       }
-
 images:
   core:
     repository: "harbor.openfuyao.com/openfuyao/oauth-server"
-    tag: "latest"
+    tag: "v25.06"
     pullPolicy: "Always"
   kubectl:
     repository: "harbor.openfuyao.com/openfuyao/kubectl-openfuyao"
-    tag: "latest"
-
+    tag: "v25.06"
 thirdPartyImages:
   busyBox:
     repository: "busybox"
     tag: "1.36.1"
-
 resources:
   requests:
     cpu: 50m
