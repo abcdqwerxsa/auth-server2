@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// UserSpec defines the desired state of User
+// UserSpec defines the desired configuration of a user in the system.
 type UserSpec struct {
 	Username              string    `json:"Username,omitempty"`
 	EncryptedPassword     []byte    `json:"EncryptedPassword,omitempty"`
@@ -28,7 +28,7 @@ type UserSpec struct {
 	FirstLogin            bool      `json:"FirstLogin,omitempty"`
 }
 
-// UserStatus defines the observed state of User
+// UserStatus represents the current runtime status of the user.
 type UserStatus struct {
 	LockStatus      string   `json:"lockStatus,omitempty"`
 	LockedTimestamp *v1.Time `json:"lockedTimestamp,omitempty"`
