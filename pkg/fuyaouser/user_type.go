@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// UserSpec defines the desired configuration of a user in the system.
+// UserSpec represents the desired configuration for system users
 type UserSpec struct {
 	Username              string    `json:"Username,omitempty"`
 	EncryptedPassword     []byte    `json:"EncryptedPassword,omitempty"`
@@ -28,14 +28,14 @@ type UserSpec struct {
 	FirstLogin            bool      `json:"FirstLogin,omitempty"`
 }
 
-// UserStatus represents the current runtime status of the user.
+// UserStatus reflects current operational state
 type UserStatus struct {
 	LockStatus      string   `json:"lockStatus,omitempty"`
 	LockedTimestamp *v1.Time `json:"lockedTimestamp,omitempty"`
 	RemainAttempts  int      `json:"RemainAttempts,omitempty"`
 }
 
-// User is the Schema for the users API
+// User represents the core user resource schema
 type User struct {
 	v1.TypeMeta   `json:",inline"`
 	v1.ObjectMeta `json:"metadata,omitempty"`
@@ -44,7 +44,7 @@ type User struct {
 	Status UserStatus `json:"status,omitempty"`
 }
 
-// UserList contains a list of User
+// UserList contains collections of User resources
 type UserList struct {
 	v1.TypeMeta `json:",inline"`
 	v1.ListMeta `json:"metadata,omitempty"`

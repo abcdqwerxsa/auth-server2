@@ -14,7 +14,6 @@
 package oauth2
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -431,45 +430,6 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 	if redirectURI == "" {
 		redirectURI = constants.FuyaoLoginEndpoint
 	}
-	cookieData := s.idpLoginStore.Get(r)
-	sessionArray, ok := cookieData.GetExtraByKey(constants.OAuthServerSessionID)
-	if !ok {
-		zlog.LogWarn("the oauth-server cookie does not contain web-oauthserver sessionid")
-		// flush the loginState
-		if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
-			zlog.LogErrorf("cannot delete the loginstore used in authorization, err: %v", err)
-		}
-		// we only log the error, the logout needs to proceed
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	oauthServerSessionID := sessionArray[0]
-
-	// dispatch one by one
-	for sessionID, proxyEndpoint := range s.oauthProxyStore[oauthServerSessionID] {
-		formData := url.Values{}
-		formData.Set(constants.SessionIDParam, sessionID)
-
-		// 创建 POST 请求
-		req, err := http.NewRequest("POST", proxyEndpoint, strings.NewReader(formData.Encode()))
-		if err != nil {
-			zlog.LogErrorf("Failed to create request: %v", err)
-		}
-		zlog.LogInfof("send logout request to %s", proxyEndpoint)
-
-		// 设置请求头，如果需要其他头部信息，可以在这里添加
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		// 发送请求
-		client := &http.Client{}
-		transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true,
-			MinVersion: tls.VersionTLS13}}
-		client.Transport = transport
-		resp, err := client.Do(req)
-		if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
-			zlog.LogErrorf("Failed to dispatch logout requests to oauth-proxies, err: %v", err)
-		}
-	}
 
 	// flush the loginState
 	if err := s.idpLoginStore.Put(w, make(sessions.Values)); err != nil {
@@ -477,7 +437,6 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		httpserver.RespondWithStatusMsg(w, http.StatusInternalServerError, 0, err.Error())
 		return
 	}
-	delete(s.oauthProxyStore, oauthServerSessionID)
 	// flush the gorilla.csrf
 	clearCSRFCookie(w)
 	zlog.LogInfof("Logout succeed for user")

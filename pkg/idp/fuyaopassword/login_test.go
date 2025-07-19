@@ -17,17 +17,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/agiledragon/gomonkey/v2"
 	authenticationv1 "k8s.io/api/authentication/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
+	dfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 
@@ -35,35 +34,36 @@ import (
 	"openfuyao/oauth-server/pkg/authenticators"
 	"openfuyao/oauth-server/pkg/constants"
 	"openfuyao/oauth-server/pkg/fuyaostore"
+	"openfuyao/oauth-server/pkg/fuyaouser"
 	"openfuyao/oauth-server/pkg/protector"
 	"openfuyao/oauth-server/pkg/sessions"
 )
 
+const (
+	failTimes        = 5
+	failMinute       = 5
+	lockMinute       = 20
+	loginStoreMaxAge = 300
+)
+
+var (
+	fakeDynamicClient  = dfake.NewSimpleDynamicClient(runtime.NewScheme())
+	fakeLoginProtector = protector.NewLoginUserProtector(fakeDynamicClient, &config.IPProtectorConfig{
+		FailTimes:    failTimes,
+		FailDuration: time.Minute * failMinute,
+		LockDuration: time.Minute * lockMinute,
+	})
+)
+
 // TestLoginHandlerGetSucceed tests the successful condition for getting login page
 func TestLoginHandlerGetSucceed(t *testing.T) {
-	req, err := http.NewRequest("GET", constants.FuyaoLoginEndpoint+"?then=/", nil)
+	req, err := http.NewRequest("GET", constants.FuyaoLoginEndpoint+"?then=/oauth2/oauth/authorize?test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
+	testLogin := mockLoginStruct()
 
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
-	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
 
@@ -74,48 +74,25 @@ func TestLoginHandlerGetSucceed(t *testing.T) {
 
 // TestLoginHandlerPostSucceed tests the successful condition for logging in
 func TestLoginHandlerPostSucceed(t *testing.T) {
-	form := url.Values{}
-	form.Add("username", "admin")
-	form.Add("password", "Soup4@LL")
-	form.Add("csrf_token", "")
-	form.Add("then", "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3")
-	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, strings.NewReader(form.Encode()))
+	reqBody := LoginRequest{
+		Username: "admin",
+		Password: []byte("Soup4@LL"),
+		Then: "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri" +
+			"=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3",
+	}
+	body, err := json.Marshal(reqBody)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	testUserSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin",
-			Namespace: "oauth-user",
-		},
-		Data: map[string][]byte{
-			"username":           []byte("admin"),
-			"groups":             []byte("system:admin"),
-			"extra":              []byte(`{"first-login":["false"]}`),
-			"encrypted-password": []byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
-		},
+	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
 	}
-	fakeClient := fake.NewSimpleClientset(testUserSecret)
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
+	req.Header.Set("Content-Type", "application/json")
 
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
-	}
 	rr := httptest.NewRecorder()
+	testLogin := mockLoginStruct()
 	testLogin.LoginHandler(rr, req)
 
 	if rr.Code != http.StatusFound {
@@ -125,48 +102,26 @@ func TestLoginHandlerPostSucceed(t *testing.T) {
 
 // TestLoginHandlerPostFail tests the failed condition for logging in
 func TestLoginHandlerPostFail(t *testing.T) {
-	form := url.Values{}
-	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
-	form.Add("username", "admin")
-	form.Add("password", "Soup4@LLL")
-	form.Add("csrf_token", "")
-	form.Add("then", then)
-	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, strings.NewReader(form.Encode()))
+	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=https%3A" +
+		"%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
+	reqBody := LoginRequest{
+		Username: "admin",
+		Password: []byte("Soup4@LL"),
+		Then:     then,
+	}
+	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	testUserSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin",
-			Namespace: "oauth-user",
-		},
-		Data: map[string][]byte{
-			"username":           []byte("admin"),
-			"groups":             []byte("system:admin"),
-			"extra":              []byte(`{"first-login":["false"]}`),
-			"encrypted-password": []byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
-		},
+	req, err := http.NewRequest("POST", constants.FuyaoLoginEndpoint, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatal(err)
 	}
-	fakeClient := fake.NewSimpleClientset(testUserSecret)
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
+	req.Header.Set("Content-Type", "application/json")
 
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
-	}
+	testLogin := mockLoginStruct()
+
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
 
@@ -186,24 +141,8 @@ func TestLoginHandlerUnknownMethod(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
+	testLogin := mockLoginStruct()
 
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
-	}
 	rr := httptest.NewRecorder()
 	testLogin.LoginHandler(rr, req)
 
@@ -214,35 +153,19 @@ func TestLoginHandlerUnknownMethod(t *testing.T) {
 
 // TestLoginPasswordConfirmHandlerGetSucceed tests the successful condition for password confirmation
 func TestLoginPasswordConfirmHandlerGetSucceed(t *testing.T) {
-	req, err := http.NewRequest("GET", constants.FuyaoPasswordConfirmEndpoint+`?then=/`, nil)
+	req, err := http.NewRequest("GET", constants.FuyaoPasswordConfirmEndpoint+`?then=/oauth2/oauth/authorize?test`,
+		nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxOTgxODEyN3x1Sy1JSmRWTGF6S20wekFjenAzbXpQMnBwdkczd19QYzRfbTNxWWxOVUJEV2xEU1BIS0xNeTV3Wk82T0JPY04zNmhyZGJVcDZZb1Q3bmdLRE5YN1pQLTlkMnhZTTFTX2RqWkJQMTI3TUNqSk9SalZ0Nk1BZDNRX0ZmaGFtRDctWlBEdk94RXB4NjNKWnhsZUZRZ3o2a1NFQmp5akl2Z2tLdEVPTmNGWno1eGNVbFExOUNFSzBmc0xTT2pTNFJoMDhmNGkycVJpbmZma0g3aV9NZFZQakV5alF4d2pLTHg1NDB6TW83UFZpd2txOTBKMjFSZUNNblpFYl9ORnlYdFFrQy1lYUZ4Y0ROc19YM2hVTldldV9pSzJLZnFaU1lCdTJEdnFzemoxLWVybkJaQ1FWRDZVQzg4bl83NjFFOEdzNXFLV3Z0Y0JiRUtoVHJKdTZmdWgzZHNwWGxrQzZVRnQtVy1DbktGdy0tN09zZ3RSWVlLY2VkeFRpUlJqTmdacVRHYkRaaHh2SnlFRl9KTWNwdGxiTVRscVdNQ3JEMUw3V3ZFYWFFTVJocHhSLXlhZF9oWlByWDBWUV90WVJORmpqeVpWaGhHb2RxUjNvfIVeE2zLQq3m_hK9Is9cGn1moYm6OYuD_Q7yuqgYKVCG",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
-	}
-	req.AddCookie(fakeCookie)
 
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
-
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
+	patches, err := createLoginTestPatches()
+	if err != nil {
+		t.Fatal(err)
 	}
+	defer patches.Reset()
+
+	testLogin := mockLoginStruct()
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
 
@@ -253,53 +176,30 @@ func TestLoginPasswordConfirmHandlerGetSucceed(t *testing.T) {
 
 // TestLoginPasswordConfirmHandlerPostSucceed tests the successful condition for password confirmation
 func TestLoginPasswordConfirmHandlerPostSucceed(t *testing.T) {
-	// prepare forms
-	form := url.Values{}
-	form.Add("new_password", "soup4@LL")
-	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redirect_uri=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
-	form.Add("then", then)
-	req, err := http.NewRequest("POST", constants.FuyaoPasswordConfirmEndpoint, strings.NewReader(form.Encode()))
+	then := "/oauth2/oauth/authorize?client_id=console&identity_provider=fuyaoPasswordProvider&redir" +
+		"ect_uri=https%3A%2F%2F192.168.100.48%3A31616%2Frest%2Fauth%2Fcallback&response_type=code&state=d7e6a4b3"
+
+	reqBody := PasswordConfirmRequest{
+		NewPassword: []byte("soup4@LL"),
+		Then:        then,
+	}
+	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxOTgxODEyN3x1Sy1JSmRWTGF6S20wekFjenAzbXpQMnBwdkczd19QYzRfbTNxWWxOVUJEV2xEU1BIS0xNeTV3Wk82T0JPY04zNmhyZGJVcDZZb1Q3bmdLRE5YN1pQLTlkMnhZTTFTX2RqWkJQMTI3TUNqSk9SalZ0Nk1BZDNRX0ZmaGFtRDctWlBEdk94RXB4NjNKWnhsZUZRZ3o2a1NFQmp5akl2Z2tLdEVPTmNGWno1eGNVbFExOUNFSzBmc0xTT2pTNFJoMDhmNGkycVJpbmZma0g3aV9NZFZQakV5alF4d2pLTHg1NDB6TW83UFZpd2txOTBKMjFSZUNNblpFYl9ORnlYdFFrQy1lYUZ4Y0ROc19YM2hVTldldV9pSzJLZnFaU1lCdTJEdnFzemoxLWVybkJaQ1FWRDZVQzg4bl83NjFFOEdzNXFLV3Z0Y0JiRUtoVHJKdTZmdWgzZHNwWGxrQzZVRnQtVy1DbktGdy0tN09zZ3RSWVlLY2VkeFRpUlJqTmdacVRHYkRaaHh2SnlFRl9KTWNwdGxiTVRscVdNQ3JEMUw3V3ZFYWFFTVJocHhSLXlhZF9oWlByWDBWUV90WVJORmpqeVpWaGhHb2RxUjNvfIVeE2zLQq3m_hK9Is9cGn1moYm6OYuD_Q7yuqgYKVCG",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
+	req, err := http.NewRequest("POST", constants.FuyaoPasswordConfirmEndpoint, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatal(err)
 	}
-	req.AddCookie(fakeCookie)
+	req.Header.Set("Content-Type", "application/json")
 
-	testUserSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin",
-			Namespace: "oauth-user",
-		},
-		Data: map[string][]byte{
-			"username":           []byte("admin"),
-			"groups":             []byte("system:admin"),
-			"extra":              []byte(`{"first-login":["true"]}`),
-			"encrypted-password": []byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
-		},
+	testLogin := mockLoginStruct()
+	patches, err := createLoginTestPatches()
+	if err != nil {
+		t.Fatal(err)
 	}
-	fakeClient := fake.NewSimpleClientset(testUserSecret)
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
+	defer patches.Reset()
 
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
-	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
 
@@ -316,13 +216,70 @@ func TestLoginPasswordConfirmHandlerPostSucceed(t *testing.T) {
 	}
 }
 
+func createLoginTestPatches() (*gomonkey.Patches, error) {
+	patches := gomonkey.NewPatches()
+	sessionMap := make(map[string][]string)
+	sessionMap[constants.UserFirstLogin] = []string{"true"}
+	jsonExtra, err := json.Marshal(sessionMap)
+	if err != nil {
+		return nil, err
+	}
+	patches.ApplyMethod(reflect.TypeOf(&sessions.CookieStore{}), "Get",
+		func(_ *sessions.CookieStore, _ *http.Request) sessions.Values {
+			return sessions.Values{
+				constants.UserName:  "admin",
+				constants.UserExtra: jsonExtra,
+			}
+		})
+	patches.ApplyFunc(fuyaouser.GetUserInfo, func(_ dynamic.Interface, name string) (*fuyaouser.User, error) {
+		return &fuyaouser.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
+			Spec: fuyaouser.UserSpec{
+				Username:     "admin",
+				PlatformRole: "platform-admin",
+				Description:  "A platform user",
+				FirstLogin:   true,
+				EncryptedPassword: []byte("IFp9vTCHQ5v0qgLrFNsD5oqNG7TS4LCs0P5IWRrAlYfFeZSk9xVm0KxRi4pOsOECvNaw3" +
+					"zc4JXvEr4j4ldxlf541zErHyqRHE+I2ik7ww5M="),
+			},
+			Status: fuyaouser.UserStatus{
+				LockStatus:      "",
+				LockedTimestamp: nil,
+				RemainAttempts:  5,
+			},
+		}, nil
+	})
+	patches.ApplyFunc(fuyaouser.PatchUserInfo, func(_ dynamic.Interface, name string, data []byte) error {
+		return nil
+	})
+	return patches, nil
+}
+
+func mockLoginStruct() *Login {
+	fakeClient := fake.NewSimpleClientset()
+	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
+	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeDynamicClient, "oauth-user")
+	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", loginStoreMaxAge, []byte("auth"),
+		[]byte("encrypt123123123"))
+
+	testLogin := &Login{
+		Provider:       "fuyaoPasswordProvider",
+		K8sClient:      fakeClient,
+		TokenStore:     fakeTokenStore,
+		Authenticator:  fakeAuthenticator,
+		idpLoginStore:  fakeIdpLoginStore,
+		loginProtector: fakeLoginProtector,
+	}
+	return testLogin
+}
+
 // TestLoginPasswordResetHandlerPostSucceed tests the successful condition for password reset
 func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 	// 构造请求体
 	requestBody := PasswordResetRequest{
 		Username:         "admin",
-		OriginalPassword: "Soup4@LL",
-		NewPassword:      "soup4@LL",
+		OriginalPassword: []byte("Soup4@LL"),
+		NewPassword:      []byte("soup4@LL"),
 	}
 	requestBodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
@@ -334,49 +291,35 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 	}
 	// 设置请求头
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-test")
 
-	// add token header
-	bearerToken := "test-test"
-	req.Header.Set("Authorization", "Bearer "+bearerToken)
-
-	// add fake secrets
-	testUserSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin",
-			Namespace: "oauth-user",
-		},
-		Data: map[string][]byte{
-			"username":           []byte("admin"),
-			"groups":             []byte("system:admin"),
-			"extra":              []byte(`{"first-login":["false"]}`),
-			"encrypted-password": []byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
-		},
-	}
-
-	fakeClient := fake.NewSimpleClientset(testUserSecret)
+	fakeClient := fake.NewSimpleClientset()
 	// 定义自定义的反应函数，模拟 TokenReview 的 Create 方法
-	fakeClient.Fake.PrependReactor("create", "tokenreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
-		createAction := action.(k8stesting.CreateAction)
-		tokenReview := createAction.GetObject().(*authenticationv1.TokenReview)
-		// 模拟返回结果
-		tokenReview.Status = authenticationv1.TokenReviewStatus{
-			Authenticated: true,
-			User: authenticationv1.UserInfo{
-				Username: "admin",
-				UID:      "12345",
-			},
-		}
-		return true, tokenReview, nil
-	})
+	fakeClient.Fake.PrependReactor("create", "tokenreviews",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			createAction := action.(k8stesting.CreateAction)
+			tokenReview := createAction.GetObject().(*authenticationv1.TokenReview)
+			// 模拟返回结果
+			tokenReview.Status = authenticationv1.TokenReviewStatus{
+				Authenticated: true,
+				User: authenticationv1.UserInfo{
+					Username: "admin",
+					UID:      "12345",
+				},
+			}
+			return true, tokenReview, nil
+		})
+
+	patches, err := createLoginTestPatches()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer patches.Reset()
 
 	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
+	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeDynamicClient, "oauth-user")
+	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", loginStoreMaxAge,
+		[]byte("auth"), []byte("encrypt123123123"))
 
 	testLogin := &Login{
 		Provider:       "fuyaoPasswordProvider",
@@ -384,7 +327,7 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 		TokenStore:     fakeTokenStore,
 		Authenticator:  fakeAuthenticator,
 		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
+		loginProtector: fakeLoginProtector,
 	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordResetHandler(rr, req)
@@ -400,93 +343,13 @@ func TestLoginPasswordConfirmHandlerRevertSucceed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxOTgxODEyN3x1Sy1JSmRWTGF6S20wekFjenAzbXpQMnBwdkczd19QYzRfbTNxWWxOVUJEV2xEU1BIS0xNeTV3Wk82T0JPY04zNmhyZGJVcDZZb1Q3bmdLRE5YN1pQLTlkMnhZTTFTX2RqWkJQMTI3TUNqSk9SalZ0Nk1BZDNRX0ZmaGFtRDctWlBEdk94RXB4NjNKWnhsZUZRZ3o2a1NFQmp5akl2Z2tLdEVPTmNGWno1eGNVbFExOUNFSzBmc0xTT2pTNFJoMDhmNGkycVJpbmZma0g3aV9NZFZQakV5alF4d2pLTHg1NDB6TW83UFZpd2txOTBKMjFSZUNNblpFYl9ORnlYdFFrQy1lYUZ4Y0ROc19YM2hVTldldV9pSzJLZnFaU1lCdTJEdnFzemoxLWVybkJaQ1FWRDZVQzg4bl83NjFFOEdzNXFLV3Z0Y0JiRUtoVHJKdTZmdWgzZHNwWGxrQzZVRnQtVy1DbktGdy0tN09zZ3RSWVlLY2VkeFRpUlJqTmdacVRHYkRaaHh2SnlFRl9KTWNwdGxiTVRscVdNQ3JEMUw3V3ZFYWFFTVJocHhSLXlhZF9oWlByWDBWUV90WVJORmpqeVpWaGhHb2RxUjNvfIVeE2zLQq3m_hK9Is9cGn1moYm6OYuD_Q7yuqgYKVCG",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
-	}
-	req.AddCookie(fakeCookie)
 
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
+	testLogin := mockLoginStruct()
 
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
-	}
 	rr := httptest.NewRecorder()
 	testLogin.PasswordConfirmHandler(rr, req)
 
 	if rr.Code != http.StatusFound {
 		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
-	}
-}
-
-func TestNewLogin(t *testing.T) {
-	type args struct {
-		idpLoginStore    *sessions.CookieStore
-		k8sClient        kubernetes.Interface
-		tokenStore       *fuyaostore.K8sSecretStore
-		loginIPProtector *protector.LoginIPProtector
-		loginConfig      *config.LoginConfig
-	}
-
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeClient, "oauth-user")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	fakeLoginIPProtector := protector.NewLoginIPProtector(&config.IPProtectorConfig{
-		FailTimes:    5,
-		FailDuration: time.Minute * 5,
-		LockDuration: time.Minute * 20,
-	})
-
-	testLogin := &Login{
-		Provider:       "fuyaoPasswordProvider",
-		K8sClient:      fakeClient,
-		TokenStore:     fakeTokenStore,
-		Authenticator:  fakeAuthenticator,
-		idpLoginStore:  fakeIdpLoginStore,
-		loginProtector: fakeLoginIPProtector,
-	}
-
-	tests := []struct {
-		name string
-		args args
-		want *Login
-	}{
-		{
-			"successfully init",
-			args{
-				idpLoginStore:    fakeIdpLoginStore,
-				k8sClient:        fakeClient,
-				tokenStore:       fakeTokenStore,
-				loginIPProtector: fakeLoginIPProtector,
-				loginConfig: &config.LoginConfig{
-					Provider:      "fuyaoPasswordProvider",
-					UserNamespace: "oauth-user",
-				},
-			},
-			testLogin,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NewLogin(tt.args.idpLoginStore, tt.args.k8sClient, tt.args.tokenStore, tt.args.loginIPProtector, tt.args.loginConfig)
-			if !reflect.DeepEqual(got.idpLoginStore, tt.want.idpLoginStore) || !reflect.DeepEqual(got.TokenStore, tt.want.TokenStore) || !reflect.DeepEqual(got.loginProtector, tt.want.loginProtector) {
-				t.Errorf("NewLogin() = %v, want %v", got, tt.want)
-			}
-		})
 	}
 }
