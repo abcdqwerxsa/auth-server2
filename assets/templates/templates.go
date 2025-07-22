@@ -292,8 +292,8 @@ const (
         .cancel-btn{background-color:#fff!important;color:black;border:1px solid #ccc!important}
         .cancel-btn:hover{background-color:#f8f8f8!important}
         .cancel-btn:active{background-color:#e8e8e8!important}
-        .disabled_primary_btn{opacity: 0.65;pointer: not-allowed;}
-        .spinner { display: none;width: 16px;height: 16px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin 1s linear infinite;margin-left: 8px;}
+        .disabled_primary_btn{opacity: 0.65;cursor: not-allowed!important;}
+        .spinner { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin 1s linear infinite;margin-left: 8px;}
         button:disabled .spinner {display: inline-block;}
         @keyframes spin {to { transform: rotate(360deg); }}
     </style>
@@ -471,9 +471,9 @@ const (
 
         document.getElementById("confirm-btn").addEventListener("click", (event) => {
             event.preventDefault();
-            document.getElementById('confirm-btn').disabled = true;
-            document.getElementById('confirm-btn').classList.add('disabled_primary_btn');
             if (passwordValid1 && passwordValid2 && passwordValid3 && confirmValid) {
+                document.getElementById('confirm-btn').disabled = true;
+                document.getElementById('confirm-btn').classList.add('disabled_primary_btn');
                 let confirmForm = document.getElementById('confirm-form');
                 let newPassword = confirmForm.new_password.value;
                 let newPasswordEncode = new TextEncoder().encode(newPassword);
