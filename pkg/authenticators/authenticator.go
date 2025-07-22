@@ -129,7 +129,7 @@ func (a *FuyaoPasswordAuthenticator) fetchUserInfoAndStoredPassword(username str
 	var userinfo user.DefaultInfo
 	userinfo.Name = username
 	userinfo.UID = string(userCR.UID)
-	userinfo.Groups = []string{"system-authenticated"}
+	userinfo.Groups = []string{"system:authenticated"}
 	encryptedPasswd := userCR.Spec.EncryptedPassword
 	firstLogin := userCR.Spec.FirstLogin
 	userinfo.Extra = make(map[string][]string)

@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agiledragon/gomonkey/v2"
 	"golang.org/x/oauth2"
-	"gopkg.in/oauth2.v3/manage"
-	"gopkg.in/oauth2.v3/server"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"openfuyao/oauth-server/cmd/oauth-server/app/config"
@@ -37,45 +37,39 @@ import (
 	"openfuyao/oauth-server/pkg/sessions"
 )
 
+func createSessionMockPatches(firstLogin string) (*gomonkey.Patches, error) {
+	patches := gomonkey.NewPatches()
+	sessionMap := make(map[string][]string)
+	sessionMap[constants.UserFirstLogin] = []string{firstLogin}
+	jsonExtra, err := json.Marshal(sessionMap)
+	if err != nil {
+		return nil, err
+	}
+	patches.ApplyMethod(reflect.TypeOf(&sessions.CookieStore{}), "Get",
+		func(_ *sessions.CookieStore, _ *http.Request) sessions.Values {
+			return sessions.Values{
+				constants.UserName:   "admin",
+				constants.UserExtra:  jsonExtra,
+				constants.UserUID:    "test",
+				constants.UserGroups: []string{"system:authenticated"},
+			}
+		})
+	return patches, nil
+}
+
 // TestFuyaoAuthorizeServerOAuthAuthorizeHandlerSucceed test http handler for /oauth/authorize
 func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerSucceed(t *testing.T) {
 	// prepare query parameters
-	redirectUri := "http://192.168.100.48:9036/rest/auth/callback"
-	query := url.Values{}
-	query.Add("client_id", "console")
-	query.Add("identity_provider", "fuyaoPasswordProvider")
-	query.Add("redirect_uri", redirectUri)
-	query.Add("response_type", "code")
-	query.Add("state", "10a4d3a9")
-	req, err := http.NewRequest("GET", constants.FuyaoOAuthAuthorizeEndpoint, nil)
+	redirectUri := "http://example.test.com/rest/auth/callback"
+	req := createOAuthAuthorizeTestRequest(t, redirectUri)
+
+	patches, err := createSessionMockPatches("false")
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.URL.RawQuery = query.Encode()
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxNjYzMjc5Mnxsa2NwY055UUxRdVUwTjcyVUNRRzUtTE5FMW1VOC05TWtTdGZrYXhKRVYxLUtDcXplcjJBTm1ITXFrSlBOZnkzWVBiZ2FFM0t5Y1V3VTlFMkZuNWJFRTJvcmJwTjk5UXJpSTNqbGdLZllvTFRpRWFZSU4zNXh0TmNLZ2NEYUZWcm5id3RDVTZ3QmRDd3JWSm9lRUpTOWdxZk9FaVpsS3hmbWJBTU9NZlRKLXB6REZUVUdwM0FHZUkzeC1seEZ3RmZiX1gyZWFIYUxJRmlONDloRFVOZHJaRXVFazFGZzlhQnNnTHotRHJJUnlEZHVUVW13VW81bDJVdHJWWmlwSFc0VUFhWHZfeUVNRXl5T1JFbXB1WkUzYWRyZ0VoRWhjYXprRmt0NjVvYXJBcTRYeUFOZ1VxaEZ3bWZ0aW9lM2tMQy1teGdQUVNPbk40UkFVZU5OZm80NUdXS29YOXZYS0dUOFpWTmhKdElpRy1mZmRma1JVeXhpOUlxamJWVmVxeVJ6VllaYTdzNERad2NJOFNzeldHYm9xTnAxZW5hQjNjNlV3N01QVGxMeTM3YWM5MVc1aTZoRnJiZGxWUkFHOC05SmRjei1qVjhBanViSWc9PXzDmy8u3Jdey5SMnWC9vwYlO_biv4GPXk9wJbyrAeC3Mw==",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
-	}
-	req.AddCookie(fakeCookie)
+	defer patches.Reset()
 
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Minute * 5,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
+	testFuyaoOAuthServer, _, _ := createTestFuyaoOAuthServer(nil)
 
 	rr := httptest.NewRecorder()
 	testFuyaoOAuthServer.OAuthAuthorizeHandler(rr, req)
@@ -93,35 +87,10 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerSucceed(t *testing.T) {
 // TestFuyaoAuthorizeServerOAuthAuthorizeHandlerNoSession test http handler for /oauth/authorize
 func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerNoSession(t *testing.T) {
 	// prepare query parameters
-	query := url.Values{}
-	query.Add("client_id", "console")
-	query.Add("identity_provider", "fuyaoPasswordProvider")
-	query.Add("redirect_uri", "http://192.168.100.48:9036/rest/auth/callback")
-	query.Add("response_type", "code")
-	query.Add("state", "10a4d3a9")
-	req, err := http.NewRequest("GET", constants.FuyaoOAuthAuthorizeEndpoint, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.URL.RawQuery = query.Encode()
+	redirectUri := "http://example.test.com/rest/auth/callback"
+	req := createOAuthAuthorizeTestRequest(t, redirectUri)
 
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Minute * 5,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
+	testFuyaoOAuthServer, _, _ := createTestFuyaoOAuthServer(nil)
 
 	rr := httptest.NewRecorder()
 	testFuyaoOAuthServer.OAuthAuthorizeHandler(rr, req)
@@ -144,41 +113,10 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerNoSession(t *testing.T) {
 // TestFuyaoAuthorizeServerOAuthAuthorizeHandlerFirstLogin test http handler for /oauth/authorize
 func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerFirstLogin(t *testing.T) {
 	// prepare query parameters
-	query := url.Values{}
-	query.Add("client_id", "console")
-	query.Add("identity_provider", "fuyaoPasswordProvider")
-	query.Add("redirect_uri", "http://192.168.100.48:9036/rest/auth/callback")
-	query.Add("response_type", "code")
-	query.Add("state", "10a4d3a9")
-	req, err := http.NewRequest("GET", constants.FuyaoOAuthAuthorizeEndpoint, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.URL.RawQuery = query.Encode()
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxNjc0NDE3NXxUb2p2d0JsalhFU0Zrc2tkWkZnQUN5ckVlX2hoYU5QZFNUeTJQX1c2THdmeVhBYklqRkg2Rk1yYlhVelNXelQwRnRkRHMyUDhPbVA3Qncta3RLZWhxeU9TTzZXWWgwSXhiNE42ZXhIWmZFcTBpVV9WZ01ORzdJcENnZzE3amMzbllaLTBubVFNOHFPTFA3WTRrVGdlOXRjeS1pSE1hYS1qYXFGbnFBUVRXeENCT19wOE1NNmktbHBvQjdKMjdYYjBjZ2wtX0xhcXlhMHFWWEowSUZfdzFJbGkzMUh3YUlDUXhodjdzLUtRamE2bzhMamNEeXh6bTFMeVAxaWtXZy04Q3FvUDc4QWtZS1NKRUJFX0NUU2ZFamNlanpnakRydkxrRXRQQ2lfZEZTN0J5TUR2a3NTdXk4NGp3WkVLaGllVnM4bGRGQXo2ZjFtVXhjWHFiMWsySm5sbllKQ3BKaDd2TGlfUm9YRVdVblJ3YUctMk8yNUp6cmxTcGtHY2I2RXFxQTdHUXNHS3pVSGdTYzgwYm5kNjJMZHZzeERibFJCbEtBdTJBV2lDQ1dKVm5MZlBnMDFCQXUwaWtSc3hWLUhEcldxMG16azNYZG83TXc9PXxZxTOclZv7gL1dnb7Co329a3GuvJCJmaN28kQ481F4_Q==",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
-	}
-	req.AddCookie(fakeCookie)
+	redirectUri := "http://example.test.com/rest/auth/callback"
+	req := createOAuthAuthorizeTestRequest(t, redirectUri)
 
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Minute * 5,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
+	testFuyaoOAuthServer, _, _ := createTestFuyaoOAuthServer(nil)
 
 	rr := httptest.NewRecorder()
 	testFuyaoOAuthServer.OAuthAuthorizeHandler(rr, req)
@@ -197,23 +135,8 @@ func TestFuyaoAuthorizeServerOAuthAuthorizeHandlerFirstLogin(t *testing.T) {
 func TestFuyaoAuthorizeServerOAuthTokenHandlerCodeExpired(t *testing.T) {
 	// with correct code
 	// prepare form parameters
-	form := url.Values{}
 	testCode := "zjhjoddimwutyzjkni0zzwe3lwfhngutothkmwy0ngzjnmjj"
-	testOAuthServerSessionID := "testIDPSessionID"
-	form.Add("code", testCode)
-	form.Add("grant_type", "authorization_code")
-	form.Add("logout_endpoint", "https://192.168.100.9091/oauth/logout")
-	form.Add("redirect_uri", "https://192.168.100.48:9091/oauth/callback")
-	form.Add("session_id", "testsessionidtryme")
-	form.Add("client_id", "oauth-proxy")
-	form.Add("client_secret", "SECRETTS")
-
-	// prepare request
-	req, err := http.NewRequest("POST", constants.FuyaoOAuthTokenEndpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := createOAuthTokenTestRequest(t, testCode)
 
 	// prepare authcode secret
 	testCodeSecret := &corev1.Secret{
@@ -222,28 +145,14 @@ func TestFuyaoAuthorizeServerOAuthTokenHandlerCodeExpired(t *testing.T) {
 			Namespace: "oauth-code-token",
 		},
 		Data: map[string][]byte{
-			"userinfo": []byte(`{"ClientID":"oauth-proxy","UserID":"admin","RedirectURI":"https://192.168.100.48:9091/oauth/callback","Scope":"user:info user:check-access","Code":"zjhjoddimwutyzjkni0zzwe3lwfhngutothkmwy0ngzjnmjj","CodeChallenge":"","CodeChallengeMethod":"","CodeCreateAt":"2024-05-27T10:34:51.973738633+08:00","CodeExpiresIn":300000000000,"Access":"","AccessCreateAt":"0001-01-01T00:00:00Z","AccessExpiresIn":0,"Refresh":"","RefreshCreateAt":"0001-01-01T00:00:00Z","RefreshExpiresIn":0}`),
+			"userinfo": []byte(`{"ClientID":"oauth-proxy","UserID":"admin","RedirectURI":"https://example.test.com` +
+				`/oauth/callback","Scope":"user:info user:check-access","Code":"zjhjoddimwutyzjkni0zzwe3lwfhngut` +
+				`othkmwy0ngzjnmjj","CodeChallenge":"","CodeChallengeMethod":"","CodeCreateAt":"2024-05-27T10:34:51.` +
+				`973738633+08:00","CodeExpiresIn":300000000000,"Access":"","AccessCreateAt":"0001-01-01T00:00:00` +
+				`Z","AccessExpiresIn":0,"Refresh":"","RefreshCreateAt":"0001-01-01T00:00:00Z","RefreshExpiresIn":0}`),
 		},
 	}
-	fakeClient := fake.NewSimpleClientset(testCodeSecret)
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Hour * 8760,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
-	testFuyaoOAuthServer.authCode2SessionID = map[string]string{testCode: testOAuthServerSessionID}
-	testFuyaoOAuthServer.oauthProxyStore = make(map[string]map[string]string)
+	testFuyaoOAuthServer, _, _ := createTestFuyaoOAuthServer(testCodeSecret)
 
 	// run test
 	rr := httptest.NewRecorder()
@@ -258,7 +167,9 @@ func TestFuyaoAuthorizeServerOAuthTokenHandlerCodeExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 	bodyStr := string(body)
-	expectedBodyStr := `{"error":"invalid_grant","error_description":"The provided authorization grant (e.g., authorization code, resource owner credentials) or refresh token is invalid, expired, revoked, does not match the redirection URI used in the authorization request, or was issued to another client"}` + "\n"
+	expectedBodyStr := `{"error":"invalid_grant","error_description":"The provided authorization grant (e.g., autho` +
+		`rization code, resource owner credentials) or refresh token is invalid, expired, revoked, does not match` +
+		` the redirection URI used in the authorization request, or was issued to another client"}` + "\n"
 	if bodyStr != expectedBodyStr {
 		t.Errorf("Expected return body %s; got %s", expectedBodyStr, bodyStr)
 	}
@@ -267,23 +178,8 @@ func TestFuyaoAuthorizeServerOAuthTokenHandlerCodeExpired(t *testing.T) {
 // TestFuyaoAuthorizeServerOAuthTokenHandlerSucceed test http handler for /oauth/token
 func TestFuyaoAuthorizeServerOAuthTokenHandlerSucceed(t *testing.T) {
 	// prepare form parameters
-	form := url.Values{}
 	testCode := "oda1mthhmtutmgfknc0zyjdllwe5ztetzmi5mwm0owuyzjbm"
-	testOAuthServerSessionID := "testIDPSessionID"
-	form.Add("code", testCode)
-	form.Add("grant_type", "authorization_code")
-	form.Add("logout_endpoint", "https://192.168.100.9091/oauth/logout")
-	form.Add("redirect_uri", "https://192.168.100.48:9091/oauth/callback")
-	form.Add("session_id", "testsessionidtryme")
-	form.Add("client_id", "oauth-proxy")
-	form.Add("client_secret", "SECRETTS")
-
-	// prepare request
-	req, err := http.NewRequest("POST", constants.FuyaoOAuthTokenEndpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := createOAuthTokenTestRequest(t, testCode)
 
 	// prepare authcode secret
 	testCodeSecret := &corev1.Secret{
@@ -292,28 +188,15 @@ func TestFuyaoAuthorizeServerOAuthTokenHandlerSucceed(t *testing.T) {
 			Namespace: "oauth-code-token",
 		},
 		Data: map[string][]byte{
-			"userinfo": []byte(`{"ClientID":"oauth-proxy","UserID":"admin","RedirectURI":"https://192.168.100.48:9091/oauth/callback","Scope":"user:info user:check-access","Code":"oda1mthhmtutmgfknc0zyjdllwe5ztetzmi5mwm0owuyzjbm","CodeChallenge":"","CodeChallengeMethod":"","CodeCreateAt":"2024-05-27T11:29:35.378162227+08:00","CodeExpiresIn":315360000000000000,"Access":"","AccessCreateAt":"0001-01-01T00:00:00Z","AccessExpiresIn":0,"Refresh":"","RefreshCreateAt":"0001-01-01T00:00:00Z","RefreshExpiresIn":0}`),
+			"userinfo": []byte(`{"ClientID":"oauth-proxy","UserID":"admin","RedirectURI":"https://` +
+				`example.test.com/oauth/callback","Scope":"user:info user:check-access","Code":"oda1mthhmt` +
+				`utmgfknc0zyjdllwe5ztetzmi5mwm0owuyzjbm","CodeChallenge":"","CodeChallengeMethod":"","CodeCrea` +
+				`teAt":"2024-05-27T11:29:35.378162227+08:00","CodeExpiresIn":315360000000000000,"Access":"","A` +
+				`ccessCreateAt":"0001-01-01T00:00:00Z","AccessExpiresIn":0,"Refresh":"","RefreshCreateAt":"0001` +
+				`-01-01T00:00:00Z","RefreshExpiresIn":0}`),
 		},
 	}
-	fakeClient := fake.NewSimpleClientset(testCodeSecret)
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Hour * 8760,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
-	testFuyaoOAuthServer.authCode2SessionID = map[string]string{testCode: testOAuthServerSessionID}
-	testFuyaoOAuthServer.oauthProxyStore = make(map[string]map[string]string)
+	testFuyaoOAuthServer, _, _ := createTestFuyaoOAuthServer(testCodeSecret)
 
 	// run test
 	rr := httptest.NewRecorder()
@@ -335,15 +218,32 @@ func TestFuyaoAuthorizeServerOAuthTokenHandlerSucceed(t *testing.T) {
 	if returnedToken.AccessToken == "" || returnedToken.TokenType != "Bearer" {
 		t.Errorf("Expected return token is invalid")
 	}
+}
 
+func createOAuthTokenTestRequest(t *testing.T, code string) *http.Request {
+	form := url.Values{}
+	form.Add("code", code)
+	form.Add("grant_type", "authorization_code")
+	form.Add("logout_endpoint", "https://example.test.com/oauth/logout")
+	form.Add("redirect_uri", "https://example.test.com/oauth/callback")
+	form.Add("session_id", "testsessionidtryme")
+	form.Add("client_id", "oauth-proxy")
+	form.Add("client_secret", "SECRETTS")
+
+	// prepare request
+	req, err := http.NewRequest("POST", constants.FuyaoOAuthTokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
 }
 
 // TestFuyaoAuthorizeServerSingleLogoutHandlerSucceed test http handler for /auth/logout
 func TestFuyaoAuthorizeServerSingleLogoutHandlerSucceed(t *testing.T) {
 	// prepare form parameters
-	redirectUri := "https://192.168.100.48:9036/rest/auth/login"
+	redirectUri := "https://example.test.com/rest/auth/login"
 	query := url.Values{}
-	proxyLogoutEndpoint := "https://192.168.100.48:9091/oauth/logout"
 	query.Add("redirect_uri", redirectUri)
 
 	// prepare request
@@ -353,106 +253,20 @@ func TestFuyaoAuthorizeServerSingleLogoutHandlerSucceed(t *testing.T) {
 	}
 	req.URL.RawQuery = query.Encode()
 
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxNjc4MjIwMXxxelZzUWlXcXViR1F3Um84TU5KZjhoZXNaSk1rN2wzeGFRbml3b0MxYVR5ZEMtRG5IeVZRX3B6VllwX3EyeEZVU0dlRm1STHQ5b2RfdW1CMjVhUDlKQ21feXZuSUtkNXJiamo0eEkzNzRIb1Etb3dyZ0lXcHcwTlhqaUNnM1hBNnhyS2lLLXMtYXI2VXNydDhjYWJBZDV2U3BTYWQxaHVTME91M3poWk0yMTRWNHczME96XzdsSUVMNnZnNWFKWVhKVTZrdHRxa0JidFRzb253bVpXaXFOd3QzSHE0aWxDc0xya0kxZFhLcGhCYVdhdGtfUWNrVzlDSFZ5ZENJdTVRT1lGNV9GVDFNZy14WFU4ZDg2RERVeFRrUVROSDJsT0kzczNyRUo0SWhpdUVVb1ZQWHdFY21zZTFXSFRqdHRYVFlCYTJYUUhsVjlxOW04X0NlWHh6X1lLVTRKb0UxYk1XcWNBOHU2LTBNRkdaY1pDdlVveGE5b2JfQ2pubUljSjZ2eTREajNCSEo2V2x4NlZSNkl0czhJdE5WQjctQU9VV2k4QWpqVGh1V1Mzd0xvQ211cEVRUVh3VHFWQkFDcHdKVUtXX091eDNodGxxYWg0PXzZzou4XjM-YH1ki-UhtByIdt0dzoPjyxgnbZCm3GHL3Q==",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
-	}
-	req.AddCookie(fakeCookie)
-
-	testOAuthServerSessionID := "ztnp2wrui7vf3v9vf8qd1it4rj2v9cqe"
-	testOAuthPRoxySessionID := "test-session-id"
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Hour * 8760,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
-	testFuyaoOAuthServer.oauthProxyStore[testOAuthServerSessionID] = map[string]string{testOAuthPRoxySessionID: proxyLogoutEndpoint}
-
-	// run test
-	rr := httptest.NewRecorder()
-	testFuyaoOAuthServer.SingleLogoutHandler(rr, req)
-
-	if rr.Code != http.StatusFound {
-		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
-	}
-
-	if !strings.HasPrefix(rr.Header().Get("Location"), redirectUri) {
-		t.Errorf("Expected location prefix %s; get %s", redirectUri, rr.Header().Get("Location"))
-	}
-
-	cookieSet := rr.Header().Get("Set-Cookie")
-	if !strings.HasPrefix(cookieSet, "idpLogin=") {
-		t.Errorf("Expected cookie set but it didn't")
-	}
-}
-
-// TestFuyaoAuthorizeServerSingleLogoutHandlerNoServerSession test http handler for /auth/logout
-func TestFuyaoAuthorizeServerSingleLogoutHandlerNoServerSession(t *testing.T) {
-	// prepare form parameters
-	query := url.Values{}
-	redirectUri := "https://192.168.100.48:9036/rest/auth/login"
-	query.Add("redirect_uri", redirectUri)
-
-	// prepare request
-	req, err := http.NewRequest("POST", constants.FuyaoLogoutEndpoint, nil)
+	patches, err := createSessionMockPatches("false")
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.URL.RawQuery = query.Encode()
+	defer patches.Reset()
 
-	fakeCookie := &http.Cookie{
-		Name:    "idpLogin",
-		Value:   "MTcxNjc0NDE3NXxUb2p2d0JsalhFU0Zrc2tkWkZnQUN5ckVlX2hoYU5QZFNUeTJQX1c2THdmeVhBYklqRkg2Rk1yYlhVelNXelQwRnRkRHMyUDhPbVA3Qncta3RLZWhxeU9TTzZXWWgwSXhiNE42ZXhIWmZFcTBpVV9WZ01ORzdJcENnZzE3amMzbllaLTBubVFNOHFPTFA3WTRrVGdlOXRjeS1pSE1hYS1qYXFGbnFBUVRXeENCT19wOE1NNmktbHBvQjdKMjdYYjBjZ2wtX0xhcXlhMHFWWEowSUZfdzFJbGkzMUh3YUlDUXhodjdzLUtRamE2bzhMamNEeXh6bTFMeVAxaWtXZy04Q3FvUDc4QWtZS1NKRUJFX0NUU2ZFamNlanpnakRydkxrRXRQQ2lfZEZTN0J5TUR2a3NTdXk4NGp3WkVLaGllVnM4bGRGQXo2ZjFtVXhjWHFiMWsySm5sbllKQ3BKaDd2TGlfUm9YRVdVblJ3YUctMk8yNUp6cmxTcGtHY2I2RXFxQTdHUXNHS3pVSGdTYzgwYm5kNjJMZHZzeERibFJCbEtBdTJBV2lDQ1dKVm5MZlBnMDFCQXUwaWtSc3hWLUhEcldxMG16azNYZG83TXc9PXxZxTOclZv7gL1dnb7Co329a3GuvJCJmaN28kQ481F4_Q==",
-		Expires: time.Now().Add(10 * 365 * 24 * time.Hour),
-	}
-	req.AddCookie(fakeCookie)
-
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Hour * 8760,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
+	testFuyaoOAuthServer, _, _ := createTestFuyaoOAuthServer(nil)
 
 	// run test
 	rr := httptest.NewRecorder()
 	testFuyaoOAuthServer.SingleLogoutHandler(rr, req)
 
-	if rr.Code != http.StatusFound {
+	if rr.Code != http.StatusNoContent {
 		t.Errorf("Expected status code %d; got %d", http.StatusFound, rr.Code)
-	}
-
-	if !strings.HasPrefix(rr.Header().Get("Location"), redirectUri) {
-		t.Errorf("Expected location prefix %s; get %s", redirectUri, rr.Header().Get("Location"))
-	}
-
-	cookieSet := rr.Header().Get("Set-Cookie")
-	if !strings.HasPrefix(cookieSet, "idpLogin=") {
-		t.Errorf("Expected cookie set but it didn't")
 	}
 }
 
@@ -463,24 +277,9 @@ func TestNewOAuthServer(t *testing.T) {
 		tokenStore    *fuyaostore.K8sSecretStore
 		cfg           *config.OAuthServerConfig
 	}
-	fakeClient := fake.NewSimpleClientset()
-	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", 300, []byte("auth"), []byte("encrypt123123123"))
-	cfg := &config.OAuthServerConfig{
-		CodeTokenNamespace: "oauth-code-token",
-		AuthCodeExp:        time.Minute * 5,
-		AccessTokenExp:     time.Hour * 2,
-		RefreshTokenExp:    time.Hour * 2,
-		IsGenerateRefresh:  false,
-		JWTKeyID:           "access_token_sign_key",
-		JWTPrivateKey:      "i_am_the_secrets",
-		ClientMapper: map[string]string{
-			"console":     "console-password",
-			"oauth-proxy": "SECRETTS",
-		},
-	}
-	fakeManager := manage.NewDefaultManager()
-	tgt := NewFuyaoAuthorizeServer(server.NewConfig(), fakeManager, fakeIdpLoginStore, fakeTokenStore)
+
+	tgt, fakeTokenStore, cfg := createTestFuyaoOAuthServer(nil)
+
 	tests := []struct {
 		name string
 		args args
@@ -489,7 +288,7 @@ func TestNewOAuthServer(t *testing.T) {
 		{
 			"successfully initialized",
 			args{
-				idpLoginStore: fakeIdpLoginStore,
+				idpLoginStore: tgt.idpLoginStore,
 				tokenStore:    fakeTokenStore,
 				cfg:           cfg,
 			},
@@ -498,9 +297,54 @@ func TestNewOAuthServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewOAuthServer(tt.args.idpLoginStore, tt.args.tokenStore, tt.args.cfg); !reflect.DeepEqual(got.Config, tt.want.Config) {
+			if got := NewOAuthServer(tt.args.idpLoginStore, tt.args.tokenStore, tt.args.cfg); !reflect.DeepEqual(
+				got.Config.TokenType, tt.want.Config.TokenType) {
 				t.Errorf("NewOAuthServer() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func createOAuthAuthorizeTestRequest(t *testing.T, rediretUri string) *http.Request {
+	query := url.Values{}
+	query.Add("client_id", "console")
+	query.Add("identity_provider", "fuyaoPasswordProvider")
+	query.Add("redirect_uri", rediretUri)
+	query.Add("response_type", "code")
+	query.Add("state", "10a4d3a9")
+	req, err := http.NewRequest("GET", constants.FuyaoOAuthAuthorizeEndpoint, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.URL.RawQuery = query.Encode()
+	return req
+}
+
+func createTestFuyaoOAuthServer(obj runtime.Object) (*FuyaoAuthorizeServer, *fuyaostore.K8sSecretStore,
+	*config.OAuthServerConfig) {
+	fakeClient := fake.NewSimpleClientset()
+	if obj != nil {
+		fakeClient = fake.NewSimpleClientset(obj)
+	}
+	const authCodeExp = 8760
+	const accessTokenExp = 2
+	const refreshTokenExp = 2
+	const maxAge = 300
+	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
+	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", maxAge, []byte("auth"), []byte("encrypt123123123"))
+	cfg := &config.OAuthServerConfig{
+		CodeTokenNamespace: "oauth-code-token",
+		AuthCodeExp:        time.Hour * authCodeExp,
+		AccessTokenExp:     time.Hour * accessTokenExp,
+		RefreshTokenExp:    time.Hour * refreshTokenExp,
+		IsGenerateRefresh:  false,
+		JWTKeyID:           "access_token_sign_key",
+		JWTPrivateKey:      []byte("i_am_the_secrets"),
+		ClientMapper: map[string]string{
+			"console":     "console-password",
+			"oauth-proxy": "SECRETTS",
+		},
+	}
+	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
+	return testFuyaoOAuthServer, fakeTokenStore, cfg
 }

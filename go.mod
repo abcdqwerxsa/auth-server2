@@ -3,14 +3,15 @@ module openfuyao/oauth-server
 go 1.21
 
 require (
+	github.com/agiledragon/gomonkey/v2 v2.11.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
-	github.com/google/uuid v1.3.0
 	github.com/gorilla/csrf v1.7.2
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.17.0
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.21.0
 	golang.org/x/oauth2 v0.16.0
@@ -50,6 +51,7 @@ require (
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
@@ -67,6 +69,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
