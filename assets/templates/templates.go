@@ -86,10 +86,10 @@ const (
         .cancel-btn:active{background-color:#e8e8e8!important}
         .error-placeholder {fill: #fff2f0;}
         .pf-m-error__icon {stroke: #e7434a;}
-        .disabled_primary_btn{opacity: 0.65;cursor: not-allowed!important;}
-        .spinner { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin 1s linear infinite;margin-left: 8px;}
-        button:disabled .spinner {display: inline-block;}
-        @keyframes spin {to { transform: rotate(360deg); }}
+        .disabled_primary_login_btn{opacity: 0.65;cursor: not-allowed!important;}
+        .spinner_login { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin_login 1s linear infinite;margin-left: 8px;}
+        button:disabled .spinner_login {display: inline-block;}
+        @keyframes spin_login {to { transform: rotate(360deg); }}
     </style>
 </head>
 
@@ -150,7 +150,7 @@ const (
                 {{.CSRFToken}}
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden=""></div>
                 <div class="btn-block"><button type="submit" id="login-btn" class="btn-primary login-btn" ` +
-		`formnovalidate=""><span>登录</span><span class="spinner"></span></button>
+		`formnovalidate=""><span>登录</span><span class="spinner_login"></span></button>
                 </div>
             </form>
         </div>
@@ -198,7 +198,7 @@ const (
             switchAlertVisibility(passwordAlert, passwordValid);
             if (usernameValid && passwordValid) {
                 document.getElementById('login-btn').disabled = true;
-                document.getElementById('login-btn').classList.add('disabled_primary_btn');
+                document.getElementById('login-btn').classList.add('disabled_primary_login_btn');
                 let loginForm = document.getElementById('login-form');
                 let password = loginForm.password.value;
                 let passwordEncode = new TextEncoder().encode(password);
@@ -223,7 +223,7 @@ const (
 				})
                 .finally(() => {
                     document.getElementById('login-btn').disabled = false;
-                    document.getElementById('login-btn').classList.remove('disabled_primary_btn');
+                    document.getElementById('login-btn').classList.remove('disabled_primary_login_btn');
                 });
             }
         });
