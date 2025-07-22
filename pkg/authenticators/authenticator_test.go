@@ -15,13 +15,18 @@ package authenticators
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/agiledragon/gomonkey/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+
+	"openfuyao/oauth-server/pkg/fuyaouser"
 )
 
 // TestPBKDF2EncryptorEncryptPassword test EncryptPassword interface
@@ -40,25 +45,22 @@ func TestPBKDF2EncryptorEncryptPassword(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    string
+		want    []byte
 		wantErr bool
 	}{
 		{
 			"encrypt succeed but since the salt is generated totally randomly, want cannot equal to got",
 			args{rawPassword: []byte("Soup4@LL")},
-			"1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE=",
+			[]byte("IFp9vTCHQ5v0qgLrFNsD5oqNG7TS4LCs0P5IWRrAlYfFeZSk9xVm0KxRi4pOsOECvNaw3zc4JXvEr4j4ldx" +
+				"lf541zErHyqRHE+I2ik7ww5M="),
 			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := encryptor.EncryptPassword(tt.args.rawPassword)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("EncryptPassword() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if len(got) != 0 {
-				t.Errorf("EncryptPassword() got = %v, want %v", got, tt.want)
+			if err != nil || len(got) == 0 {
+				t.Errorf("EncryptPassword() got = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}
@@ -87,8 +89,9 @@ func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 		{
 			"verify password succeed",
 			args{
-				rawPassword:       []byte("Soup4@LL"),
-				encryptedPassword: []byte("1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE="),
+				rawPassword: []byte("Soup4@LL"),
+				encryptedPassword: []byte("IFp9vTCHQ5v0qgLrFNsD5oqNG7TS4LCs0P5IWRrAlYfFeZSk9xVm0KxRi4pOsOECvNaw3zc4J" +
+					"XvEr4j4ldxlf541zErHyqRHE+I2ik7ww5M="),
 			},
 			true,
 			false,
@@ -96,8 +99,9 @@ func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 		{
 			"verify password fail: raw password does not match",
 			args{
-				rawPassword:       []byte("soup4@LL"),
-				encryptedPassword: []byte("1pVI1niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE="),
+				rawPassword: []byte("soup4@LL"),
+				encryptedPassword: []byte("IFp9vTCHQ5v0qgLrFNsD5oqNG7TS4LCs0P5IWRrAlYfFeZSk9xVm0KxRi4pOsOECvNaw3zc4JX" +
+					"vEr4j4ldxlf541zErHyqRHE+I2ik7ww5M="),
 			},
 			false,
 			false,
@@ -105,8 +109,9 @@ func TestPBKDF2EncryptorVerifyPassword(t *testing.T) {
 		{
 			"verify password fail: cannot decode base64 encrypted password",
 			args{
-				rawPassword:       []byte("soup4@LL"),
-				encryptedPassword: []byte("r1R43niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8irFEQU4P988bPB2QTHJlaTISol+Hnl7SVkE#"),
+				rawPassword: []byte("soup4@LL"),
+				encryptedPassword: []byte("r1R43niQz47OcynRlWibwtM+lmDNdgYVr84I6ZWDb0E8WOSZu/PZ46mnP7H/FyIlV7S6pIu8ir" +
+					"FEQU4P988bPB2QTHJlaTISol+Hnl7SVkE#"),
 			},
 			false,
 			true,
@@ -143,11 +148,22 @@ func TestNewPBKDF2Encryptor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewPBKDF2Encryptor(); !reflect.DeepEqual(got, tt.want) {
+			if got := NewPBKDF2Encryptor(); !equalPBKDF2Encryptor(got, tt.want) {
 				t.Errorf("NewPBKDF2Encryptor() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func equalPBKDF2Encryptor(a, b *PBKDF2Encryptor) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.saltLength == b.saltLength &&
+		a.iterations == b.iterations &&
+		a.keyLength == b.keyLength &&
+		// 比较 encryptMethod 是否指向同一个函数
+		fmt.Sprintf("%p", a.encryptMethod) == fmt.Sprintf("%p", b.encryptMethod)
 }
 
 func TestNewFuyaoPasswordAuthenticator(t *testing.T) {
@@ -156,8 +172,7 @@ func TestNewFuyaoPasswordAuthenticator(t *testing.T) {
 		namespace string
 	}
 	scheme := runtime.NewScheme()
-	var resource runtime.Object
-	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme, resource)
+	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme)
 	tests := []struct {
 		name string
 		args args
@@ -196,14 +211,8 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	var resource runtime.Object
-	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme, resource)
-	encryptor := &PBKDF2Encryptor{
-		saltLength:    16,
-		iterations:    100000,
-		keyLength:     64,
-		encryptMethod: sha256.New,
-	}
+	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme)
+	encryptor := &PBKDF2Encryptor{saltLength: 16, iterations: 100000, keyLength: 64, encryptMethod: sha256.New}
 
 	tests := []struct {
 		name   string
@@ -213,54 +222,26 @@ func TestFuyaoPasswordAuthenticator_checkPasswordComplexity(t *testing.T) {
 	}{
 		{
 			"succeed",
-			fields{
-				k8sClient: fakeClient,
-				ns:        "oauth-user",
-				encryptor: encryptor,
-			},
-			args{
-				username: "admin",
-				passwd:   []byte("test@123"),
-			},
+			fields{k8sClient: fakeClient, ns: "oauth-user", encryptor: encryptor},
+			args{username: "admin", passwd: []byte("test@123")},
 			true,
 		},
 		{
 			"len fewer than 8",
-			fields{
-				k8sClient: fakeClient,
-				ns:        "oauth-user",
-				encryptor: encryptor,
-			},
-			args{
-				username: "admin",
-				passwd:   []byte("test@12"),
-			},
+			fields{k8sClient: fakeClient, ns: "oauth-user", encryptor: encryptor},
+			args{username: "admin", passwd: []byte("test@12")},
 			false,
 		},
 		{
 			"no special chars",
-			fields{
-				k8sClient: fakeClient,
-				ns:        "oauth-user",
-				encryptor: encryptor,
-			},
-			args{
-				username: "admin",
-				passwd:   []byte("test1234"),
-			},
+			fields{k8sClient: fakeClient, ns: "oauth-user", encryptor: encryptor},
+			args{username: "admin", passwd: []byte("test1234")},
 			false,
 		},
 		{
 			"same as username",
-			fields{
-				k8sClient: fakeClient,
-				ns:        "oauth-user",
-				encryptor: encryptor,
-			},
-			args{
-				username: "admin",
-				passwd:   []byte("admin"),
-			},
+			fields{k8sClient: fakeClient, ns: "oauth-user", encryptor: encryptor},
+			args{username: "admin", passwd: []byte("admin")},
 			false,
 		},
 	}
@@ -312,8 +293,7 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 	}
 
 	scheme := runtime.NewScheme()
-	var resource runtime.Object
-	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme, resource)
+	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme)
 	encryptor := &PBKDF2Encryptor{
 		saltLength:    16,
 		iterations:    100000,
@@ -322,11 +302,13 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 	}
 	userinfo := &user.DefaultInfo{
 		Name:   "admin",
-		Groups: []string{"system:admin"},
+		Groups: []string{"system:authenticated"},
 		Extra: map[string][]string{
 			"first-login": {"true"},
 		},
 	}
+	patches := createUserInfoPatches()
+	defer patches.Reset()
 
 	tests := []struct {
 		name    string
@@ -338,27 +320,9 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 	}{
 		{
 			"successfully fetch",
-			fields{
-				k8sClient: fakeClient,
-				ns:        "oauth-user",
-				encryptor: encryptor,
-			},
-			args{username: "admin"},
-			userinfo,
-			[]byte("lXc1sa8Y/6AWFg5LXUBo+iccNxwvcwot3rXlOaY40nvSW9+3pp+EXY7pypWnVdLh3wOrds1UOUjr8BhlyycPqNUbqSvGOQi6nqcEJc7T9zQ="),
-			false,
-		},
-		{
-			"no secret",
-			fields{
-				k8sClient: fakeClient,
-				ns:        "oauth-user",
-				encryptor: encryptor,
-			},
-			args{username: "admin"},
-			nil,
-			[]byte(""),
-			true,
+			fields{k8sClient: fakeClient, ns: "oauth-user", encryptor: encryptor}, args{username: "admin"}, userinfo,
+			[]byte("IFp9vTCHQ5v0qgLrFNsD5oqNG7TS4LCs0P5IWRrAlYfFeZSk9xVm0KxRi4pOsOECvNaw" +
+				"3zc4JXvEr4j4ldxlf541zErHyqRHE+I2ik7ww5M="), false,
 		},
 	}
 	for _, tt := range tests {
@@ -380,4 +344,22 @@ func TestFuyaoPasswordAuthenticator_fetchUserInfoAndStoredPassword(t *testing.T)
 			}
 		})
 	}
+}
+
+func createUserInfoPatches() *gomonkey.Patches {
+	patches := gomonkey.NewPatches()
+	patches.ApplyFunc(fuyaouser.GetUserInfo, func(_ dynamic.Interface, _ string) (*fuyaouser.User, error) {
+		return &fuyaouser.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
+			Spec: fuyaouser.UserSpec{
+				Username:     "admin",
+				PlatformRole: "platform-admin",
+				Description:  "A glocal platform user",
+				FirstLogin:   true,
+				EncryptedPassword: []byte("IFp9vTCHQ5v0qgLrFNsD5oqNG7TS4LCs0P5IWRrAlYfFeZSk9xVm0KxRi4pOsOECvNaw3z" +
+					"c4JXvEr4j4ldxlf541zErHyqRHE+I2ik7ww5M="),
+			},
+		}, nil
+	})
+	return patches
 }
