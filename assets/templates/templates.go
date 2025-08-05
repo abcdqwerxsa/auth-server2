@@ -87,7 +87,7 @@ const (
         .error-placeholder {fill: #fff2f0;}
         .pf-m-error__icon {stroke: #e7434a;}
         .disabled_primary_login_btn{opacity: 0.65;cursor: not-allowed!important;}
-        .spinner_login { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin_login 1s linear infinite;margin-left: 8px;}
+        #spinner_login { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin_login 1s linear infinite;margin-left: 8px;}
         .spinner_login_disabled {display: inline-block!important;}
         @keyframes spin_login {to { transform: rotate(360deg); }}
     </style>
@@ -150,7 +150,7 @@ const (
                 {{.CSRFToken}}
                 <div><input id="then" name="then" type="text" value="{{.Then}}" hidden=""></div>
                 <div class="btn-block"><button type="submit" id="login-btn" class="btn-primary login-btn" ` +
-		`formnovalidate=""><span>登录</span><span class="spinner_login"></span></button>
+		`formnovalidate=""><span>登录</span><span id="spinner_login"></span></button>
                 </div>
             </form>
         </div>
@@ -305,7 +305,7 @@ const (
         .cancel-btn:hover{background-color:#f8f8f8!important}
         .cancel-btn:active{background-color:#e8e8e8!important}
         .disabled_primary_btn{opacity: 0.65;cursor: not-allowed!important;}
-        .spinner { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin 1s linear infinite;margin-left: 8px;}
+        #spinner { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin 1s linear infinite;margin-left: 8px;}
         .spinner_disabled{display: inline-block!important;}
         @keyframes spin {to { transform: rotate(360deg); }}
     </style>
@@ -400,7 +400,7 @@ const (
                 <div class="btn-block">
 					<button id="cancel-btn" class="cancel-btn" type="button"><span>取消</span></button>
                     <button id="confirm-btn" type="submit" class="btn-primary confirm-btn"
-                        formnovalidate><span>确认</span><span class="spinner"></span></button>
+                        formnovalidate><span>确认</span><span id="spinner"></span></button>
                 </div>
             </form>
         </div>
