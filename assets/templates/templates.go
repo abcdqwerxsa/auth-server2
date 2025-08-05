@@ -88,7 +88,7 @@ const (
         .pf-m-error__icon {stroke: #e7434a;}
         .disabled_primary_login_btn{opacity: 0.65;cursor: not-allowed!important;}
         .spinner_login { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin_login 1s linear infinite;margin-left: 8px;}
-        button:disabled .spinner_login {display: inline-block;}
+        .spinner_login_disabled {display: inline-block!important;}
         @keyframes spin_login {to { transform: rotate(360deg); }}
     </style>
 </head>
@@ -199,6 +199,7 @@ const (
             if (usernameValid && passwordValid) {
                 document.getElementById('login-btn').disabled = true;
                 document.getElementById('login-btn').classList.add('disabled_primary_login_btn');
+                document.getElementById('spinner_login').classList.add('spinner_login_disabled');
                 let loginForm = document.getElementById('login-form');
                 let password = loginForm.password.value;
                 let passwordEncode = new TextEncoder().encode(password);
@@ -224,6 +225,7 @@ const (
                 .finally(() => {
                     document.getElementById('login-btn').disabled = false;
                     document.getElementById('login-btn').classList.remove('disabled_primary_login_btn');
+                    document.getElementById('spinner_login').classList.remove('spinner_login_disabled');
                 });
             }
         });
@@ -304,7 +306,7 @@ const (
         .cancel-btn:active{background-color:#e8e8e8!important}
         .disabled_primary_btn{opacity: 0.65;cursor: not-allowed!important;}
         .spinner { display: none;width: 10px;height: 10px;border: 2px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: white;animation: spin 1s linear infinite;margin-left: 8px;}
-        button:disabled .spinner {display: inline-block;}
+        .spinner_disabled{display: inline-block!important;}
         @keyframes spin {to { transform: rotate(360deg); }}
     </style>
 </head>
@@ -484,6 +486,7 @@ const (
             if (passwordValid1 && passwordValid2 && passwordValid3 && confirmValid) {
                 document.getElementById('confirm-btn').disabled = true;
                 document.getElementById('confirm-btn').classList.add('disabled_primary_btn');
+                document.getElementById('spinner').classList.add('spinner_disabled');
                 let confirmForm = document.getElementById('confirm-form');
                 let newPassword = confirmForm.new_password.value;
                 let newPasswordEncode = new TextEncoder().encode(newPassword);
@@ -508,6 +511,7 @@ const (
                 .finally(()=>{
                     document.getElementById('confirm-btn').disabled = false;
                     document.getElementById('confirm-btn').classList.remove('disabled_primary_btn');
+                    document.getElementById('spinner').classList.remove('spinner_disabled');
                 });
             }
         });
