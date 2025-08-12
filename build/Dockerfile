@@ -13,7 +13,7 @@
 # currently supported builders:
 # - golang
 ARG BUILDER=golang
-ARG BUILDER_VERSION=1.21.8
+ARG BUILDER_VERSION=1.24.5
 ARG BUILDER_IMAGE=harbor.openfuyao.com/openfuyao/builder/$BUILDER:$BUILDER_VERSION
 ARG PKG=./cmd/oauth-server
 
