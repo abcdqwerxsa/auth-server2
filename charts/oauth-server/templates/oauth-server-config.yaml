@@ -17,8 +17,9 @@ data:
         {{- end }}
       },
       "IDPLoginStoreConfig": {
-        "SessionName": "idpLogin",
-        "SessionMaxAge": {{ .Values.config.loginSessionConfig.maxSeconds | quote }}
+        "SessionName": {{ .Values.config.loginSessionConfig.name | quote}},
+        "SessionMaxAge": {{ .Values.config.loginSessionConfig.maxSeconds | quote }},
+        "CsrfCookieName": {{ .Values.config.loginSessionConfig.csrfCookieName | quote}}
       },
       "IPProtectorConfig": {
         "FailTimes": {{ .Values.config.ipProtectorConfig.failTimes | quote }},
@@ -31,8 +32,7 @@ data:
         "Burst": 1e6
       },
       "LoginConfig": {
-        "Provider": "fuyaoPasswordProvider",
-        "UserNamespace": "oauth-user"
+        "Provider": "fuyaoPasswordProvider"
       },
       "OAuthServerConfig": {
         "CodeTokenNamespace": "oauth-code-token",

@@ -258,7 +258,7 @@ func createLoginTestPatches() (*gomonkey.Patches, error) {
 func mockLoginStruct() *Login {
 	fakeClient := fake.NewSimpleClientset()
 	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeDynamicClient, "oauth-user")
+	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeDynamicClient)
 	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", loginStoreMaxAge, []byte("auth"),
 		[]byte("encrypt123123123"))
 
@@ -317,7 +317,7 @@ func TestLoginPasswordResetHandlerPostSucceed(t *testing.T) {
 	defer patches.Reset()
 
 	fakeTokenStore := fuyaostore.NewK8sSecretStore(fakeClient, "oauth-code-token")
-	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeDynamicClient, "oauth-user")
+	fakeAuthenticator := authenticators.NewFuyaoPasswordAuthenticator(fakeDynamicClient)
 	fakeIdpLoginStore := sessions.NewSessionStore("idpLogin", loginStoreMaxAge,
 		[]byte("auth"), []byte("encrypt123123123"))
 

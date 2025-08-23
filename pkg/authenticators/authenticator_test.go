@@ -192,7 +192,7 @@ func TestNewFuyaoPasswordAuthenticator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewFuyaoPasswordAuthenticator(tt.args.k8sClient, tt.args.namespace); !reflect.DeepEqual(got.k8sClient, tt.want.k8sClient) {
+			if got := NewFuyaoPasswordAuthenticator(tt.args.k8sClient); !reflect.DeepEqual(got.k8sClient, tt.want.k8sClient) {
 				t.Errorf("NewFuyaoPasswordAuthenticator() = %v, want %v", got, tt.want)
 			}
 		})

@@ -58,10 +58,8 @@ type FuyaoAuthorizeServer struct {
 	idpLoginStore *sessions.CookieStore
 	// tokenStore stores the code/access-token in the k8s secret
 	tokenStore oauth2.TokenStore
-	// oauthProxyStore stores the sessionID and logout endpoints for each oauth-proxy component
-	oauthProxyStore map[string]map[string]string
-	// authCode2SessionID maps each auth-code to the central sessionID
-	authCode2SessionID map[string]string
+	// csrfCookieName
+	csrfCookieName string
 }
 
 // NewFuyaoAuthorizeServer inits a FuyaoAuthorizeServer
@@ -72,19 +70,16 @@ func NewFuyaoAuthorizeServer(
 	tokenStore oauth2.TokenStore,
 ) *FuyaoAuthorizeServer {
 	return &FuyaoAuthorizeServer{
-		Server:             server.NewServer(cfg, manager),
-		idpLoginStore:      idpLoginStore,
-		tokenStore:         tokenStore,
-		oauthProxyStore:    make(map[string]map[string]string),
-		authCode2SessionID: make(map[string]string),
+		Server:        server.NewServer(cfg, manager),
+		idpLoginStore: idpLoginStore,
+		tokenStore:    tokenStore,
 	}
 }
 
 // NewOAuthServer inits the go-oauth2 oauth server
 func NewOAuthServer(
 	idpLoginStore *sessions.CookieStore,
-	tokenStore *fuyaostore.K8sSecretStore,
-	cfg *config.OAuthServerConfig,
+	tokenStore *fuyaostore.K8sSecretStore, cfg *config.OAuthServerConfig, csrfCookieName string,
 ) *FuyaoAuthorizeServer {
 	// init inner-oauth2-server, manager and configs
 	innerOAuthServerConfig := server.NewConfig()
@@ -119,6 +114,7 @@ func NewOAuthServer(
 	manager.MapTokenStorage(tokenStore)
 
 	srv := NewFuyaoAuthorizeServer(innerOAuthServerConfig, manager, idpLoginStore, tokenStore)
+	srv.csrfCookieName = csrfCookieName
 	srv.SetInternalErrorHandler(func(err error) (re *errors.Response) {
 		log.Println("Internal Error:", err.Error())
 		return
@@ -199,28 +195,8 @@ func (s *FuyaoAuthorizeServer) OAuthAuthorizeHandler(w http.ResponseWriter, r *h
 		req.RedirectURI = client.GetDomain()
 	}
 
-	// store the map from auth-code to oauth-server sessionID for single sign out
-	s.storeToCodeSessionIDMapper(r, ti)
-
 	// finally we redirect to the client callback interface
 	s.redirectAuthorizationCode(w, req, s.GetAuthorizeData(req.ResponseType, ti))
-	return
-}
-
-func (s *FuyaoAuthorizeServer) storeToCodeSessionIDMapper(r *http.Request, ti oauth2.TokenInfo) {
-	// fetch auth-code
-	code := ti.GetCode()
-
-	// fetch the cached user info
-	cookieData := s.idpLoginStore.Get(r)
-	sessionArray, ok := cookieData.GetExtraByKey(constants.OAuthServerSessionID)
-	if !ok {
-		zlog.LogWarn("the oauth-server cookie does not contain web-oauthserver sessionid")
-		return
-	}
-	oauthServerSessionID := sessionArray[0]
-
-	s.authCode2SessionID[code] = oauthServerSessionID
 	return
 }
 
@@ -231,8 +207,6 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 		s.generateTokenError(w, err)
 		return
 	}
-
-	s.registerOauthProxyComponents(r)
 
 	ti, err := s.GetAccessToken(gt, tgr)
 	if err != nil {
@@ -247,31 +221,6 @@ func (s *FuyaoAuthorizeServer) OAuthTokenHandler(w http.ResponseWriter, r *http.
 	// 通过ExtensionFieldsHandler来将refresh-token的过期时间传回
 	s.returnAccessToken(w, s.GetTokenData(ti), nil)
 
-	return
-}
-
-func (s *FuyaoAuthorizeServer) registerOauthProxyComponents(r *http.Request) {
-	// fetch the component sessionID parameter
-	sessionID := r.FormValue(constants.SessionIDParam)
-	proxyLogoutEndpoint := r.FormValue(constants.LogoutEndpointParam)
-	code := r.FormValue(constants.CodeParam)
-	if sessionID == "" || proxyLogoutEndpoint == "" {
-		zlog.LogWarn("request does not have the session_id or logout endpoint parameter for single logout")
-		return
-	}
-
-	// fetch the idpLogin sessionID
-	oauthServerSessionID, ok := s.authCode2SessionID[code]
-	if !ok {
-		zlog.LogWarn("cannot find the corresponding sessionID for code")
-		return
-	}
-	delete(s.authCode2SessionID, code)
-
-	if _, ok = s.oauthProxyStore[oauthServerSessionID]; !ok {
-		s.oauthProxyStore[oauthServerSessionID] = make(map[string]string)
-	}
-	s.oauthProxyStore[oauthServerSessionID][sessionID] = proxyLogoutEndpoint
 	return
 }
 
@@ -418,8 +367,7 @@ func (s *FuyaoAuthorizeServer) deleteExpiredAuthCode(tgr *oauth2.TokenGenerateRe
 	return nil
 }
 
-// SingleLogoutHandler receives requests from console-service logout request and dispatch it to
-// all registered oauth-proxies
+// SingleLogoutHandler receives requests from console-service logout request flush cookies
 func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		httpserver.RespondWithStatusMsg(w, http.StatusMethodNotAllowed, 0, fuyaoerrors.ErrStrRequestMethodNotAllowed)
@@ -437,8 +385,8 @@ func (s *FuyaoAuthorizeServer) SingleLogoutHandler(w http.ResponseWriter, r *htt
 		httpserver.RespondWithStatusMsg(w, http.StatusInternalServerError, 0, err.Error())
 		return
 	}
-	// flush the gorilla.csrf
-	clearCSRFCookie(w)
+	// flush the csrf cookie
+	clearCookie(s.csrfCookieName, w)
 	zlog.LogInfof("Logout succeed for user")
 
 	// no content to return
@@ -519,9 +467,9 @@ func (s *FuyaoAuthorizeServer) returnAccessToken(
 	return
 }
 
-func clearCSRFCookie(w http.ResponseWriter) {
+func clearCookie(name string, w http.ResponseWriter) {
 	cookie := &http.Cookie{
-		Name:    "_gorilla_csrf",
+		Name:    name,
 		Value:   "",
 		Path:    "/",             // cookie的有效路径
 		Expires: time.Unix(0, 0), // 过期时间设置为Unix时间戳0，即过去的时间
