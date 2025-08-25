@@ -276,6 +276,7 @@ func TestNewOAuthServer(t *testing.T) {
 		idpLoginStore *sessions.CookieStore
 		tokenStore    *fuyaostore.K8sSecretStore
 		cfg           *config.OAuthServerConfig
+		csrf          string
 	}
 
 	tgt, fakeTokenStore, cfg := createTestFuyaoOAuthServer(nil)
@@ -291,13 +292,15 @@ func TestNewOAuthServer(t *testing.T) {
 				idpLoginStore: tgt.idpLoginStore,
 				tokenStore:    fakeTokenStore,
 				cfg:           cfg,
+				csrf:          "csrf",
 			},
 			tgt,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewOAuthServer(tt.args.idpLoginStore, tt.args.tokenStore, tt.args.cfg); !reflect.DeepEqual(
+			if got := NewOAuthServer(tt.args.idpLoginStore, tt.args.tokenStore, tt.args.cfg,
+				tt.args.csrf); !reflect.DeepEqual(
 				got.Config.TokenType, tt.want.Config.TokenType) {
 				t.Errorf("NewOAuthServer() = %v, want %v", got, tt.want)
 			}
@@ -345,6 +348,6 @@ func createTestFuyaoOAuthServer(obj runtime.Object) (*FuyaoAuthorizeServer, *fuy
 			"oauth-proxy": "SECRETTS",
 		},
 	}
-	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg)
+	testFuyaoOAuthServer := NewOAuthServer(fakeIdpLoginStore, fakeTokenStore, cfg, "csrf")
 	return testFuyaoOAuthServer, fakeTokenStore, cfg
 }

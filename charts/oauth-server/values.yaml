@@ -16,6 +16,8 @@ config:
       -----END CERTIFICATE-----
 
   loginSessionConfig:
+    name: "idpLogin"
+    csrfCookieName: "csrf"
     maxSeconds: 7200
     # signingKey和encryptionKey会在openFuyao安装的时候由installer生成并覆盖
     signingKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"

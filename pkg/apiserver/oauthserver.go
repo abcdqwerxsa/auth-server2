@@ -67,7 +67,8 @@ func NewOAuthServerAPIServer(
 	logUserProtector := protector.NewLoginUserProtector(dynamicClient, cfg.IPProtectorConfig)
 	tokenStore := fuyaostore.NewK8sSecretStore(k8sClient, cfg.OAuthServerConfig.CodeTokenNamespace)
 	login := fuyaopassword.NewLogin(idpLoginStore, tokenStore, logUserProtector, cfg)
-	oauthServer := oauth2.NewOAuthServer(idpLoginStore, tokenStore, cfg.OAuthServerConfig)
+	oauthServer := oauth2.NewOAuthServer(idpLoginStore, tokenStore, cfg.OAuthServerConfig,
+		cfg.IDPLoginStoreConfig.CsrfCookieName)
 
 	return &OAuthServerAPIServer{
 		Server:      server,
@@ -84,8 +85,12 @@ func (s *OAuthServerAPIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.Router.Use(httpserver.AccessLoggingMiddleware)
 
 	// csrf
+	csrfCookieName := s.Cfg.IDPLoginStoreConfig.CsrfCookieName
+	if csrfCookieName == "" {
+		csrfCookieName = "csrf"
+	}
 	CSRF := csrf.Protect(s.Cfg.IDPLoginStoreConfig.EncryptionKey, csrf.SameSite(csrf.SameSiteStrictMode),
-		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(0),
+		csrf.Path("/"), csrf.HttpOnly(true), csrf.MaxAge(0), csrf.CookieName(csrfCookieName),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var requestBody fuyaopassword.LoginRequest
 			if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {

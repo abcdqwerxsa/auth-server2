@@ -100,7 +100,7 @@ func NewLogin(
 		K8sClient:      k8sClient,
 		dynamicClient:  dynamicClient,
 		TokenStore:     tokenStore,
-		Authenticator:  authenticators.NewFuyaoPasswordAuthenticator(dynamicClient, cfg.LoginConfig.UserNamespace),
+		Authenticator:  authenticators.NewFuyaoPasswordAuthenticator(dynamicClient),
 		idpLoginStore:  idpLoginStore,
 		loginProtector: loginUserProtector,
 	}

@@ -115,14 +115,12 @@ func (c *OAuthServerAPIServerConfig) Complete() *OAuthServerAPIServerConfig {
 
 // LoginConfig defines all config used by fuyao login provider
 type LoginConfig struct {
-	Provider      string `json:"Provider"`
-	UserNamespace string `json:"UserNamespace"`
+	Provider string `json:"Provider"`
 }
 
 func newDefaultLoginConfig() *LoginConfig {
 	return &LoginConfig{
-		Provider:      "fuyaoPaswordProvider",
-		UserNamespace: "oauth-user",
+		Provider: "fuyaoPaswordProvider",
 	}
 }
 
@@ -132,11 +130,6 @@ func (l *LoginConfig) Validate() []error {
 
 	if l.Provider == "" {
 		errs = append(errs, fuyaoerrors.ErrLoginConfigMissing)
-	}
-
-	if l.UserNamespace == "" {
-		zlog.LogWarn("attempting to load userinfo from default namespace")
-		l.UserNamespace = "default"
 	}
 
 	return errs
@@ -177,16 +170,18 @@ func (i *IPProtectorConfig) Validate() []error {
 
 // IDPLoginStoreConfig configures the fuyaostore that temporally saves the user info
 type IDPLoginStoreConfig struct {
-	SessionName   string `json:"SessionName"`
-	SessionMaxAge int    `json:"SessionMaxAge"`
-	SigningKey    []byte `json:"SigningKey"`
-	EncryptionKey []byte `json:"EncryptionKey"`
+	SessionName    string `json:"SessionName"`
+	SessionMaxAge  int    `json:"SessionMaxAge"`
+	CsrfCookieName string `json:"CsrfCookieName"`
+	SigningKey     []byte `json:"SigningKey"`
+	EncryptionKey  []byte `json:"EncryptionKey"`
 }
 
 func newIDPLoginStoreConfig() *IDPLoginStoreConfig {
 	return &IDPLoginStoreConfig{
-		SessionName:   "idpLogin",
-		SessionMaxAge: 300,
+		SessionName:    "idpLogin",
+		SessionMaxAge:  300,
+		CsrfCookieName: "csrf",
 	}
 }
 

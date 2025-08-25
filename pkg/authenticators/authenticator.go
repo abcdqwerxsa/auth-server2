@@ -49,7 +49,7 @@ type FuyaoPasswordAuthenticator struct {
 }
 
 // NewFuyaoPasswordAuthenticator inits FuyaoPasswordAuthenticator
-func NewFuyaoPasswordAuthenticator(k8sClient dynamic.Interface, namespace string) *FuyaoPasswordAuthenticator {
+func NewFuyaoPasswordAuthenticator(k8sClient dynamic.Interface) *FuyaoPasswordAuthenticator {
 	return &FuyaoPasswordAuthenticator{
 		k8sClient: k8sClient,
 		encryptor: NewPBKDF2Encryptor(),
