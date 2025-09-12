@@ -52,7 +52,6 @@ func NewK8sSecretStore(k8sClient kubernetes.Interface, ns string) *K8sSecretStor
 
 // Create creates a new code/access-token/refresh-token
 func (s *K8sSecretStore) Create(info oauth2.TokenInfo) error {
-	zlog.LogInfof("create token-info: %v", info)
 	if code := info.GetCode(); code != "" {
 		return s.createByCode(info)
 	}
