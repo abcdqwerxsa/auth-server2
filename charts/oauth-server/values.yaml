@@ -43,11 +43,11 @@ config:
 
 images:
   core:
-    repository: "harbor.openfuyao.com/openfuyao/oauth-server"
+    repository: "cr.openfuyao.cn/openfuyao/oauth-server"
     tag: "latest"
     pullPolicy: "Always"
   kubectl:
-    repository: "harbor.openfuyao.com/openfuyao/kubectl-openfuyao"
+    repository: "cr.openfuyao.cn/openfuyao/kubectl-openfuyao"
     tag: "latest"
 
 thirdPartyImages:
