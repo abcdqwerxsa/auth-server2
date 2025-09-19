@@ -14,11 +14,11 @@
 # - golang
 ARG BUILDER=golang
 ARG BUILDER_VERSION=1.24.5
-ARG BUILDER_IMAGE=harbor.openfuyao.com/openfuyao/builder/$BUILDER:$BUILDER_VERSION
+ARG BUILDER_IMAGE=cr.openfuyao.cn/openfuyao/builder/$BUILDER:$BUILDER_VERSION
 ARG PKG=./cmd/oauth-server
 
 ARG BASE_TYPE=static
-ARG BASE_IMAGE=harbor.openfuyao.com/openfuyao/base/$BASE_TYPE
+ARG BASE_IMAGE=cr.openfuyao.cn/openfuyao/base/$BASE_TYPE
 
 # stage 1: build
 FROM $BUILDER_IMAGE AS build
