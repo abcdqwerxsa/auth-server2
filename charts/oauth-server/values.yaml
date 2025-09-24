@@ -52,7 +52,7 @@ images:
 
 thirdPartyImages:
   busyBox:
-    repository: "busybox"
+    repository: hub.oepkgs.net/openfuyao/busybox
     tag: "1.36.1"
 
 resources:
