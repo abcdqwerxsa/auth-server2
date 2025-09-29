@@ -47,7 +47,7 @@ images:
     tag: "v25.09"
 thirdPartyImages:
   busyBox:
-    repository: hub.oepkgs.net/openfuyao/busybox
+    repository: cr.openfuyao.cn/openfuyao/busybox
     tag: "1.36.1"
 resources:
   requests:
