@@ -13,7 +13,6 @@
 package protector
 
 import (
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -51,7 +50,7 @@ func (p *LoginUserProtector) CheckLocked(username string) (bool, string) {
 	userCR, err := fuyaouser.GetUserInfo(p.dynamicClient, username)
 	if err != nil {
 		zlog.LogErrorf("user %s does not exist, err: %v", username, err)
-		return true, fmt.Sprintf("用户%s不存在", username)
+		return true, fuyaoerrors.ErrStrPasswordAuthenticationFailed
 	}
 
 	if userCR.Status.LockStatus == "Locked" {
