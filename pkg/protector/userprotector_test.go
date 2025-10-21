@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	appconfig "openfuyao/oauth-server/cmd/oauth-server/app/config"
+	"openfuyao/oauth-server/pkg/fuyaoerrors"
 	"openfuyao/oauth-server/pkg/fuyaouser"
 )
 
@@ -59,7 +60,7 @@ func TestCheckLockedUserNotFound(t *testing.T) {
 
 	// 验证结果
 	assert.True(t, locked)
-	assert.Contains(t, msg, "用户testuser不存在")
+	assert.Contains(t, msg, fuyaoerrors.ErrStrPasswordAuthenticationFailed)
 }
 
 // 测试 CheckLocked 用户被锁定
