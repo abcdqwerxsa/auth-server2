@@ -28,7 +28,7 @@
                 <filteritem type="filename" name="*.yaml|_*.tpl|*ignore"/>
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
-                <filteritem type="filename" name="LICENSE"/>
+                <filteritem type="filename" name="LICENSE|loginBackground.png"/>
             </filefilter>
         </filefilterlist>
 
