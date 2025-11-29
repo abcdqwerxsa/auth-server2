@@ -54,7 +54,7 @@ jobs:
           
           # ⚠️ 修改这里：替换 <你的命名空间> 和 <你的镜像名>
           # 阿里云镜像格式: 仓库地址/命名空间/镜像名:版本
-          tags: crpi-pakm1z61vqp8x59k.cn-hangzhou.personal.cr.aliyuncs.com/nilpotenter/oauth-server:luoshu_v2
+          tags: crpi-pakm1z61vqp8x59k.cn-hangzhou.personal.cr.aliyuncs.com/nilpotenter/oauth-server:luoshu_v3
           
           # 对应 -o type=image,...,oci-mediatypes=true,rewrite-timestamp=true
           outputs: type=image,oci-mediatypes=true,rewrite-timestamp=true
