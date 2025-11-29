@@ -240,7 +240,7 @@ const (
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>openFuyao管理平台</title>
+    <title>colorlight管理平台</title>
 	<meta http-equiv="Expires" content="0">
 	<meta http-equiv="Pragma" content="no-cache">
 	<meta http-equiv="Cache-control" content="no-cache,no-store,must-revalidate">
