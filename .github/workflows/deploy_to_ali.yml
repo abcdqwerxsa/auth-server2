@@ -1,0 +1,73 @@
+name: Build and Push to Aliyun ACR
+
+on:
+  
+  workflow_dispatch:
+    inputs:
+      # 1. 定义一个用于选择分支的输入参数
+      git_ref:
+        description: '请选择要构建的分支或标签 (Branch or Tag)'
+        required: true
+        default: 'main'  # 设置默认分支
+        type: string
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出代码 (必须 fetch-depth: 0 才能获取 git log 时间)
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 设置 QEMU (构建 arm64 必须)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # 3. 设置 Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4. 登录阿里云容器镜像服务
+      # 密码通过 Secrets 读取，确保安全
+      - name: Login to Alibaba Cloud ACR
+        uses: docker/login-action@v3
+        with:
+          registry: crpi-pakm1z61vqp8x59k.cn-hangzhou.personal.cr.aliyuncs.com
+          username: aliyun8198500904
+          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+      # 5. 计算构建变量
+      - name: Calculate build args
+        id: vars
+        run: |
+          echo "COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
+          echo "VERSION=0.0.0-latest" >> $GITHUB_ENV
+
+      # 6. 构建并推送
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./build/Dockerfile
+          # 多架构支持 可添加linux/arm64
+          platforms: linux/amd64
+          # 关闭 provenance 验证信息 (对应 --provenance=false)
+          provenance: false
+          push: true
+          
+          # ⚠️ 修改这里：替换 <你的命名空间> 和 <你的镜像名>
+          # 阿里云镜像格式: 仓库地址/命名空间/镜像名:版本
+          tags: crpi-pakm1z61vqp8x59k.cn-hangzhou.personal.cr.aliyuncs.com/nilpotenter/oauth-server:luoshu_v1
+          
+          # 对应 -o type=image,...,oci-mediatypes=true,rewrite-timestamp=true
+          outputs: type=image,oci-mediatypes=true,rewrite-timestamp=true
+          
+          # 构建参数
+          build-args: |
+            GOPRIVATE=gopkg.openfuyao.cn
+            COMMIT=${{ env.COMMIT }}
+            VERSION=${{ env.VERSION }}
+            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
