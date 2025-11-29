@@ -3,13 +3,7 @@ name: Build and Push to Aliyun ACR
 on:
   
   workflow_dispatch:
-    inputs:
-      # 1. 定义一个用于选择分支的输入参数
-      git_ref:
-        description: '请选择要构建的分支或标签 (Branch or Tag)'
-        required: true
-        default: 'main'  # 设置默认分支
-        type: string
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
