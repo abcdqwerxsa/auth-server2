@@ -24,7 +24,7 @@ const (
 	<meta http-equiv="Expires" content="0">
 	<meta http-equiv="Pragma" content="no-cache">
 	<meta http-equiv="Cache-control" content="no-cache,no-store,must-revalidate">
-    <title>openFuyao管理平台</title>
+    <title>colorlight管理平台</title>
 	<style>
         body,html{margin:0;padding:0;font-size:14px;font-family:'Montserrat',sans-serif;box-sizing:border-box}
         input,button,.password-input-icon{outline:0;transition:all .2s cubic-bezier(0.645,0.045,0.355,1)}
