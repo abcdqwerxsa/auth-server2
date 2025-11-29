@@ -96,7 +96,7 @@ const (
 <body>
     <div id="root">
         <div class="form-block">
-            <h3>欢迎登录openFuyao</h3>
+            <h3>欢迎登录colorlight</h3>
             <form id="login-form" autocomplete="off">
               <div class="error-placeholder">
                 {{ if .Error }}
